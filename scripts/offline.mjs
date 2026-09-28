@@ -42,5 +42,42 @@ await page.reload();
 await page.waitForTimeout(500);
 console.log('after coming back online, setup reachable:', await page.getByTestId('game').isVisible());
 console.log('errors', errs);
+await ctx.close();
+
+/* ── the same cold start, but real-dice mode chosen on the one online visit ── */
+const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const p2 = await ctx2.newPage();
+p2.on('pageerror', (e) => errs.push('PAGEERROR(table) ' + e.message));
+await p2.goto(`http://localhost:${port}/`);
+await p2.evaluate(async () => { await navigator.serviceWorker.ready; });
+await p2.reload();
+await p2.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 10000 });
+await p2.getByTestId('dice-table').click();          // choose the mode while still online
+for (const n of ['Ana', 'Ben']) {
+  await p2.getByLabel('Player name', { exact: true }).fill(n);
+  await p2.getByTestId('add-player').click();
+}
+await ctx2.setOffline(true);
+await p2.reload();                                    // cold, offline launch
+console.log('offline table mode — dice pref kept:',
+  await p2.locator('#dice-table').getAttribute('aria-checked'), 'keypad visible:',
+  await p2.locator('#keypad').isVisible().catch(() => false));
+await p2.getByTestId('start-game').click();
+for (const f of [4, 4, 4, 4, 5]) await p2.locator(`[data-testid="entry-key"][data-face="${f}"]`).click();
+const boxesOffline = await p2.locator('button[data-testid^="score-"]:not([disabled])').count();
+await p2.getByTestId('score-four-kind').click();
+await p2.waitForTimeout(200);
+const t = await p2.evaluate(() => ({
+  pill: document.querySelector('#entry-count').textContent,
+  board: [...document.querySelectorAll('[data-testid=scoreboard-total]')].map((e) => e.textContent).join(','),
+  next: document.querySelector('[data-testid=current-player]').textContent,
+}));
+console.log(`offline real-dice entry ✓ boxes=${boxesOffline} recorded=${t.board} next=${t.next} pill=${t.pill}`);
+if (boxesOffline !== 13 || t.board !== '21,0' || t.next !== 'Ben' || t.pill !== '0 of 5') {
+  throw new Error('offline real-dice play is broken');
+}
+await ctx2.setOffline(false);
+await ctx2.close();
+console.log('errors', errs);
 await browser.close();
 server.close();
