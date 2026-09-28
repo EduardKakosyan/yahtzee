@@ -84,7 +84,7 @@ test('real-dice states are clean in both themes and both phones', async ({ brows
   }
 });
 
-test('real-dice mode with eight players stays clean', async ({ browser }) => {
+test('eight players in real-dice mode stay clean, including a full setup screen', async ({ browser }) => {
   test.setTimeout(600_000);
   const eight = ['Ana', 'Ben', 'Chloé', 'Dev', 'Mari', 'Sam', 'Tomas', 'Yuki'];
   for (const vp of [{ width: 390, height: 844 }, { width: 375, height: 667 }]) {
@@ -98,6 +98,12 @@ test('real-dice mode with eight players stays clean', async ({ browser }) => {
         await page.getByLabel('Player name', { exact: true }).fill(n);
         await page.getByTestId('add-player').click();
       }
+      // the dice fieldset makes the roster taller: Start must stay tappable
+      const cta = page.getByTestId('start-game');
+      await expect(cta).toBeInViewport();
+      await expect(cta).toBeEnabled();
+      await expect(page.getByTestId('player-chip')).toHaveCount(eight.length);
+      await page.screenshot({ path: `shots/rd8p-${vp.width}-${theme}-setup.png`, fullPage: true });
       await page.getByTestId('start-game').click();
       for (const f of FACES) await page.locator(`[data-testid="entry-key"][data-face="${f}"]`).click();
       await page.waitForTimeout(300);

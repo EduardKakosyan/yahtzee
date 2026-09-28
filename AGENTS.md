@@ -82,7 +82,11 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
     failure #13 all over again.
 17. **Playwright refuses to click a hidden element.** In table mode `#roll` and the dice are
     genuinely hidden — probes and audits must not try to use them.
-18. An 18-char name (`Tomas Tomas Tomas T`) must fit the two-column grid at 390px: the key
+18. `$('board-note')` — renderBoard threw for 3 of the contract tests before the
+    element had an id. Any new `$('…')` reference needs the id on the element.
+19. **The board note doubles as the across-the-table session line** (operator point 4):
+    once an evening tally exists it reads "Tonight · N games · leader X pts, Y wins".
+20. An 18-char name (`Tomas Tomas Tomas T`) must fit the two-column grid at 390px: the key
     tools sit beside a `3 × 62px` pill rather than on their own row, which also keeps the
     whole keypad + first boxes above the SE fold.
 

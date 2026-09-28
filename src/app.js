@@ -459,6 +459,14 @@ function bestOption(card, dice, allowed) {
 function renderBoard() {
   const g = state.game;
   const board = $('scoreboard');
+  const tally = state.session && sameRoster(state.session, g.players.map((p) => p.name)) ? state.session : null;
+  if (tally) {
+    const top = tally.players.reduce((a, b) => (b.points > a.points ? b : a), tally.players[0]);
+    $('board-note').textContent = `Tonight · ${tally.gamesPlayed} game${tally.gamesPlayed === 1 ? '' : 's'} · `
+      + `${top.name} ${top.points} pts, ${top.wins} win${top.wins === 1 ? '' : 's'}`;
+  } else {
+    $('board-note').textContent = 'Set the phone down — totals stay up.';
+  }
   board.textContent = '';
   const totals = g.players.map((p) => grandTotal(p.card));
   const top = Math.max(...totals);
