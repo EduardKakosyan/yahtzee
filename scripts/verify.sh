@@ -20,8 +20,10 @@ run "sub-path hosting"                  node scripts/subpath.mjs
 run "offline + home screen"             node scripts/offline.mjs
 run "service worker update path"        node scripts/swupdate.mjs
 run "interaction hazards"               node scripts/interactions.mjs
+run "session boundaries"                node scripts/session-reset.mjs
 run "edge cases (undo, 8p, reduced motion)" node scripts/edge.mjs
 run "three whole games vs the engine"   node scripts/longgame.mjs
+run "real-dice mode: whole games, Joker, undo, mode switch" node scripts/realdice.mjs
 echo
 if [ "$fail" -eq 0 ]; then echo "ALL GREEN ($APP_URL)"; else echo "$fail GROUP(S) FAILED"; fi
 exit "$fail"

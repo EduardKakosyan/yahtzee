@@ -29,11 +29,26 @@ async function fullGame(page) {
   await page.getByTestId('score-yahtzee').click();
   await page.waitForTimeout(150);
   console.log('undo visible after record (before rolling):', await page.locator('#undo').isVisible());
+  // Undo must bring the whole turn back, not just unwrite the box: same faces,
+  // same holds, same rolls left. (Two-player game, so the turn is Ana's again.)
   await page.locator('#undo').click();
-  console.log('after undo state:', await page.getByTestId('score-yahtzee').getAttribute('data-state'),
-    'value', await page.getByTestId('score-yahtzee').getByTestId('score-value').textContent(),
-    'current', await page.getByTestId('current-player').textContent());
-  console.log('dice cleared after undo:', (await page.getByTestId('die').evaluateAll((e) => e.map((x) => x.getAttribute('data-value')))).join('|'));
+  const back = await page.evaluate(() => {
+    const g = JSON.parse(localStorage.getItem('yahtzee.state.v1')).game;
+    return { state: document.querySelector('[data-testid=score-yahtzee]').dataset.state,
+      value: document.querySelector('[data-testid=score-yahtzee] [data-testid=score-value]').textContent,
+      current: document.querySelector('[data-testid=current-player]').textContent,
+      dice: g.dice.join(','), rolls: g.rollsLeft, rolled: g.rolledCount,
+      diceShown: [...document.querySelectorAll('[data-testid=die]')].map((d) => d.getAttribute('data-value')).join(',') };
+  });
+  const ok = back.state === 'open' && back.dice === '6,6,6,6,6' && back.diceShown === '6,6,6,6,6'
+    && back.rolls === 2 && back.rolled === 1 && back.current === 'Solo';
+  console.log('after undo:', JSON.stringify(back), '-> turn restored exactly:', ok);
+  if (!ok) throw new Error('undo did not restore the turn');
+  // the window closes as soon as this player touches the turn again
+  await page.getByTestId('die').nth(0).click();
+  await page.waitForTimeout(120);
+  console.log('undo hidden after a tap:', await page.locator('#undo').evaluate((e) => e.classList.contains('invisible')));
+  await page.getByTestId('die').nth(0).click();
   await page.evaluate(() => { window.__yahtzeeDice = [6, 6, 6, 6, 6]; });
   await page.getByTestId('roll').click();
   await page.getByTestId('score-yahtzee').click();

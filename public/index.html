@@ -50,6 +50,31 @@
     </header>
 
     <div class="setup-body">
+      <fieldset class="dice-mode" id="dice-mode">
+        <legend class="dice-mode-legend">Dice</legend>
+        <div class="seg" role="radiogroup" aria-label="Where the dice come from">
+          <button type="button" class="seg-opt" id="dice-phone" data-testid="dice-phone" role="radio" aria-checked="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <rect x="6.5" y="2.6" width="11" height="18.8" rx="2.8" stroke="currentColor" stroke-width="2" fill="none"/>
+              <circle cx="10.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="11.5" r="1.4" fill="currentColor"/>
+              <circle cx="10.5" cy="14.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="17" r="1.4" fill="currentColor"/>
+            </svg>
+            <span>On this phone</span>
+          </button>
+          <button type="button" class="seg-opt" id="dice-table" data-testid="dice-table" role="radio" aria-checked="false">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <rect x="3" y="3" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+              <circle cx="5.8" cy="5.8" r="1.1" fill="currentColor"/><circle cx="8.8" cy="8.8" r="1.1" fill="currentColor"/>
+              <rect x="12.4" y="12.4" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+              <circle cx="15.2" cy="15.2" r="1.1" fill="currentColor"/><circle cx="18.2" cy="18.2" r="1.1" fill="currentColor"/>
+              <circle cx="18.2" cy="15.2" r="1.1" fill="currentColor"/>
+            </svg>
+            <span>Real dice at the table</span>
+          </button>
+        </div>
+        <p class="dice-mode-note" id="dice-mode-note">The phone rolls and tumbles five dice on screen.</p>
+      </fieldset>
+
       <form class="add-form" id="add-form" novalidate>
         <label class="field-label" for="player-name">Player name</label>
         <div class="field-row">
@@ -118,6 +143,28 @@
         <div class="round-pips" id="round-pips" aria-hidden="true"></div>
       </div>
       <div class="game-top-actions">
+        <button type="button" class="btn btn-icon btn-dice-mode" id="dice-game" data-mode="phone" aria-label="Dice come from this phone. Change where the dice come from.">
+          <svg class="face die-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <rect x="6.5" y="2.6" width="11" height="18.8" rx="2.8" stroke="currentColor" stroke-width="2" fill="none"/>
+            <circle cx="10.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="11.5" r="1.4" fill="currentColor"/>
+            <circle cx="10.5" cy="14.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="17" r="1.4" fill="currentColor"/>
+          </svg>
+          <svg class="face table-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <rect x="3" y="3" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+            <circle cx="5.8" cy="5.8" r="1.1" fill="currentColor"/><circle cx="8.8" cy="8.8" r="1.1" fill="currentColor"/>
+            <rect x="12.4" y="12.4" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+            <circle cx="15.2" cy="15.2" r="1.1" fill="currentColor"/><circle cx="18.2" cy="18.2" r="1.1" fill="currentColor"/>
+            <circle cx="18.2" cy="15.2" r="1.1" fill="currentColor"/>
+          </svg>
+          <span class="lbl sr-only" id="dice-mode-inline">On phone</span>
+        </button>
+        <button type="button" class="btn btn-icon" id="table-game" aria-label="Standings for the whole table">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M3.4 19c0-3.1 2.5-5.2 5.6-5.2s5.6 2.1 5.6 5.2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M16.2 5.4a3.1 3.1 0 0 1 0 6M17.6 13.9c2.2.5 3.4 2.3 3.4 4.6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button type="button" class="btn btn-icon" id="how-game" data-testid="how-to-play" aria-label="How to play">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -143,7 +190,32 @@
 
     <div class="felt">
       <div class="dice" id="dice" role="group" aria-label="Dice"></div>
-      <div class="roll-row">
+
+      <!-- real dice at the table: five slots to fill in, no rolling on screen -->
+      <div class="slots" id="slots" role="group" aria-label="The five dice at the table" hidden></div>
+      <div class="keypad" id="keypad" hidden>
+        <div class="keys" id="keys" role="group" aria-label="Dice values — tap to fill the next slot"></div>
+        <div class="entry-bar" id="entry-bar">
+          <p class="entry-count" id="entry-count" data-ready="false">0 of 5</p>
+          <button type="button" class="btn btn-key-tool" id="entry-last" data-testid="entry-last">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+              <path d="M12 9.5 17 15M17 9.5 12 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="lbl">Last die</span>
+          </button>
+          <button type="button" class="btn btn-key-tool" id="entry-clear" data-testid="entry-clear">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+              <path d="M8.5 8.5 15.5 15.5M15.5 8.5 8.5 15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="lbl">Clear</span>
+          </button>
+        </div>
+        <p class="entry-hint" id="entry-hint"></p>
+      </div>
+
+      <div class="roll-row" id="roll-row">
         <button type="button" class="btn btn-roll" data-testid="roll" id="roll"><span id="roll-label">Roll all five</span></button>
         <p class="rolls">Rolls<b data-testid="rolls-left" id="rolls-left">3</b></p>
       </div>
@@ -215,6 +287,11 @@
     <div class="sheet-grip" aria-hidden="true"></div>
     <h2 id="how-title" class="sheet-title">How to play</h2>
     <div class="sheet-body">
+      <h3>Two ways to roll</h3>
+      <p><b>On this phone</b> — the app tumbles five dice on screen; tap a die to hold it and roll up to three times.
+        <b>Real dice at the table</b> — you throw your own dice and tell the phone the five faces you ended with:
+        tap them in any order, tap a die to fix it, then tap the box you want. Choose either at setup or with the dice
+        button in the top bar; switching never changes anyone’s scores. Both score by exactly the same rules.</p>
       <p><b>The game.</b> 13 rounds; everyone takes one turn each round, in seating order. A turn is up to
         <b>three rolls</b>. After the first and second roll you may hold any dice — held dice keep their value,
         tap one again to release it. After one, two or three rolls you <b>must</b> score in exactly one open box,
@@ -243,6 +320,54 @@
         everyone tied wins. <b>Play again</b> keeps the same friends, rotates who starts and keeps counting for the evening.</p>
     </div>
     <button type="button" class="btn btn-primary" id="how-close">Got it</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ TABLE / STANDINGS ══════════════════════ -->
+<div class="sheet-wrap" id="table-sheet" hidden>
+  <div class="sheet-backdrop" data-close="1"></div>
+  <div class="sheet sheet-table" role="dialog" aria-modal="true" aria-labelledby="table-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="table-title" class="sheet-title">The table</h2>
+    <p class="table-sub" id="table-sub">Round 1 of 13 · highest total wins</p>
+    <ol class="sheet-rows" id="table-rows" aria-label="Standings for this game"></ol>
+    <div class="sheet-session" id="table-session" hidden>
+      <h3 class="sheet-h3">Tonight’s tally <span class="games">Games <b id="table-games">1</b></span></h3>
+      <ul id="table-session-rows"></ul>
+    </div>
+    <button type="button" class="btn btn-primary" id="table-close">Back to the game</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ DICE MODE ══════════════════════ -->
+<div class="sheet-wrap" id="dice-sheet" hidden>
+  <div class="sheet-backdrop" data-close="1"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dice-sheet-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="dice-sheet-title" class="sheet-title">Where do the dice come from?</h2>
+    <div class="seg seg-stack" role="radiogroup" aria-label="Where the dice come from">
+      <button type="button" class="seg-opt" id="dice-sheet-phone" role="radio" aria-checked="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <rect x="6.5" y="2.6" width="11" height="18.8" rx="2.8" stroke="currentColor" stroke-width="2" fill="none"/>
+          <circle cx="10.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="11.5" r="1.4" fill="currentColor"/>
+          <circle cx="10.5" cy="14.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="17" r="1.4" fill="currentColor"/>
+        </svg>
+        <span>On this phone</span>
+      </button>
+      <button type="button" class="seg-opt" id="dice-sheet-table" role="radio" aria-checked="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <rect x="3" y="3" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+          <circle cx="5.8" cy="5.8" r="1.1" fill="currentColor"/><circle cx="8.8" cy="8.8" r="1.1" fill="currentColor"/>
+          <rect x="12.4" y="12.4" width="8.6" height="8.6" rx="2.2" stroke="currentColor" stroke-width="2" fill="none"/>
+          <circle cx="15.2" cy="15.2" r="1.1" fill="currentColor"/><circle cx="18.2" cy="18.2" r="1.1" fill="currentColor"/>
+          <circle cx="18.2" cy="15.2" r="1.1" fill="currentColor"/>
+        </svg>
+        <span>Real dice at the table</span>
+      </button>
+    </div>
+    <p class="dice-mode-note" id="dice-sheet-note"></p>
+    <p class="dice-mode-note"><b>Nobody’s scores change</b> when you switch.</p>
+    <button type="button" class="btn btn-primary" id="dice-sheet-close">Done</button>
   </div>
 </div>
 

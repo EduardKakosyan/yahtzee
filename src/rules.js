@@ -115,6 +115,59 @@ export function emptyCard() {
   return card;
 }
 
+/* ───────────── real dice at the table: the phone only transcribes ───────────── */
+export const ENTRY_LEN = 5;
+export const emptyEntry = () => [0, 0, 0, 0, 0];
+export const entryCount = (g) => g.entry.filter((v) => v >= 1 && v <= 6).length;
+export const entryComplete = (g) => entryCount(g) === ENTRY_LEN;
+/** Has this player started entering/rolling yet? Undo stops being offered then. */
+export const turnTouched = (g) => g.rolledCount > 0 || entryCount(g) > 0;
+
+/**
+ * Put `face` into slot `i` (0 to clear). A real-dice turn is only "rolled" once all
+ * five faces are in, which is what unlocks the scorecard; editing anything after that
+ * locks it again. The engine is otherwise untouched, so scoring/Joker rules are shared.
+ */
+export function setEntryFace(g, i, face) {
+  if (g.finished || i < 0 || i >= ENTRY_LEN) return false;
+  if (face !== 0 && !(face >= 1 && face <= 6)) return false;
+  g.entry[i] = face;
+  syncEntry(g);
+  return true;
+}
+
+export function clearEntry(g) {
+  if (g.finished) return false;
+  g.entry = emptyEntry();
+  syncEntry(g);
+  return true;
+}
+
+export function syncEntry(g) {
+  if (entryComplete(g)) {
+    g.dice = g.entry.slice();
+    g.rolledCount = 1;
+    g.rollsLeft = 0;
+    g.held = [false, false, false, false, false];
+  } else {
+    g.dice = [0, 0, 0, 0, 0];
+    g.rolledCount = 0;
+    g.rollsLeft = 3;
+    g.held = [false, false, false, false, false];
+  }
+}
+
+/** A fresh turn wipes the real-dice entry too. */
+function resetTurn(g) {
+  g.turnNumber += 1;
+  g.turnIndex = (g.startIndex + (g.turnNumber % g.players.length)) % g.players.length;
+  g.rollsLeft = 3;
+  g.dice = [0, 0, 0, 0, 0];
+  g.rolledCount = 0;
+  g.held = [false, false, false, false, false];
+  g.entry = emptyEntry();
+}
+
 export function newGame(names, startIndex = 0) {
   return {
     kind: 'game',
@@ -127,6 +180,7 @@ export function newGame(names, startIndex = 0) {
     dice: [0, 0, 0, 0, 0],
     rolledCount: 0,
     held: [false, false, false, false, false],
+    entry: emptyEntry(),
     lastRecord: null,
     finished: false,
   };
@@ -167,27 +221,44 @@ export function record(g, cat, dice = g.dice) {
     value: card[cat],
     bonus,
     dice: dice.slice(),
+    // the turn exactly as it was before this tap, so Undo can put it back
+    prev: {
+      dice: g.dice.slice(),
+      held: g.held.slice(),
+      rollsLeft: g.rollsLeft,
+      rolledCount: g.rolledCount,
+      entry: g.entry.slice(),
+    },
     wasYahtzeeMoment: cat === 'yahtzee' && card[cat] === 50,
   };
-  g.turnNumber += 1;
-  g.turnIndex = (g.startIndex + (g.turnNumber % g.players.length)) % g.players.length;
-  g.rollsLeft = 3;
-  g.dice = [0, 0, 0, 0, 0];
-  g.rolledCount = 0;
-  g.held = [false, false, false, false, false];
+  resetTurn(g);
   g.finished = g.players.every((p) => CATEGORIES.every((k) => p.card[k] != null));
   return true;
 }
 
 export function undo(g) {
   if (g.finished || !g.lastRecord) return false;
-  const { playerIndex, cat, value, bonus } = g.lastRecord;
+  const { playerIndex, cat, value, bonus, prev } = g.lastRecord;
   const card = g.players[playerIndex].card;
   if (card[cat] !== value) return false;
   card[cat] = null;
   card.yahtzeeBonus -= bonus;
   g.turnNumber -= 1;
   g.turnIndex = playerIndex;
+  // back to the turn exactly as it stood: same faces, holds and rolls left
+  if (prev) {
+    g.held = Array.isArray(prev.held) ? prev.held.slice() : [false, false, false, false, false];
+    g.rollsLeft = Number.isInteger(prev.rollsLeft) ? prev.rollsLeft : 0;
+    g.rolledCount = Number.isInteger(prev.rolledCount) ? prev.rolledCount : 0;
+    g.entry = Array.isArray(prev.entry) ? prev.entry.slice() : emptyEntry();
+    g.dice = g.rolledCount > 0 ? prev.dice.slice() : [0, 0, 0, 0, 0];
+  } else {
+    g.rollsLeft = 3;
+    g.dice = [0, 0, 0, 0, 0];
+    g.rolledCount = 0;
+    g.held = [false, false, false, false, false];
+    g.entry = emptyEntry();
+  }
   g.lastRecord = null;
   return true;
 }

@@ -119,6 +119,59 @@ function emptyCard() {
   return card;
 }
 
+/* ───────────── real dice at the table: the phone only transcribes ───────────── */
+const ENTRY_LEN = 5;
+const emptyEntry = () => [0, 0, 0, 0, 0];
+const entryCount = (g) => g.entry.filter((v) => v >= 1 && v <= 6).length;
+const entryComplete = (g) => entryCount(g) === ENTRY_LEN;
+/** Has this player started entering/rolling yet? Undo stops being offered then. */
+const turnTouched = (g) => g.rolledCount > 0 || entryCount(g) > 0;
+
+/**
+ * Put `face` into slot `i` (0 to clear). A real-dice turn is only "rolled" once all
+ * five faces are in, which is what unlocks the scorecard; editing anything after that
+ * locks it again. The engine is otherwise untouched, so scoring/Joker rules are shared.
+ */
+function setEntryFace(g, i, face) {
+  if (g.finished || i < 0 || i >= ENTRY_LEN) return false;
+  if (face !== 0 && !(face >= 1 && face <= 6)) return false;
+  g.entry[i] = face;
+  syncEntry(g);
+  return true;
+}
+
+function clearEntry(g) {
+  if (g.finished) return false;
+  g.entry = emptyEntry();
+  syncEntry(g);
+  return true;
+}
+
+function syncEntry(g) {
+  if (entryComplete(g)) {
+    g.dice = g.entry.slice();
+    g.rolledCount = 1;
+    g.rollsLeft = 0;
+    g.held = [false, false, false, false, false];
+  } else {
+    g.dice = [0, 0, 0, 0, 0];
+    g.rolledCount = 0;
+    g.rollsLeft = 3;
+    g.held = [false, false, false, false, false];
+  }
+}
+
+/** A fresh turn wipes the real-dice entry too. */
+function resetTurn(g) {
+  g.turnNumber += 1;
+  g.turnIndex = (g.startIndex + (g.turnNumber % g.players.length)) % g.players.length;
+  g.rollsLeft = 3;
+  g.dice = [0, 0, 0, 0, 0];
+  g.rolledCount = 0;
+  g.held = [false, false, false, false, false];
+  g.entry = emptyEntry();
+}
+
 function newGame(names, startIndex = 0) {
   return {
     kind: 'game',
@@ -131,6 +184,7 @@ function newGame(names, startIndex = 0) {
     dice: [0, 0, 0, 0, 0],
     rolledCount: 0,
     held: [false, false, false, false, false],
+    entry: emptyEntry(),
     lastRecord: null,
     finished: false,
   };
@@ -171,27 +225,44 @@ function record(g, cat, dice = g.dice) {
     value: card[cat],
     bonus,
     dice: dice.slice(),
+    // the turn exactly as it was before this tap, so Undo can put it back
+    prev: {
+      dice: g.dice.slice(),
+      held: g.held.slice(),
+      rollsLeft: g.rollsLeft,
+      rolledCount: g.rolledCount,
+      entry: g.entry.slice(),
+    },
     wasYahtzeeMoment: cat === 'yahtzee' && card[cat] === 50,
   };
-  g.turnNumber += 1;
-  g.turnIndex = (g.startIndex + (g.turnNumber % g.players.length)) % g.players.length;
-  g.rollsLeft = 3;
-  g.dice = [0, 0, 0, 0, 0];
-  g.rolledCount = 0;
-  g.held = [false, false, false, false, false];
+  resetTurn(g);
   g.finished = g.players.every((p) => CATEGORIES.every((k) => p.card[k] != null));
   return true;
 }
 
 function undo(g) {
   if (g.finished || !g.lastRecord) return false;
-  const { playerIndex, cat, value, bonus } = g.lastRecord;
+  const { playerIndex, cat, value, bonus, prev } = g.lastRecord;
   const card = g.players[playerIndex].card;
   if (card[cat] !== value) return false;
   card[cat] = null;
   card.yahtzeeBonus -= bonus;
   g.turnNumber -= 1;
   g.turnIndex = playerIndex;
+  // back to the turn exactly as it stood: same faces, holds and rolls left
+  if (prev) {
+    g.held = Array.isArray(prev.held) ? prev.held.slice() : [false, false, false, false, false];
+    g.rollsLeft = Number.isInteger(prev.rollsLeft) ? prev.rollsLeft : 0;
+    g.rolledCount = Number.isInteger(prev.rolledCount) ? prev.rolledCount : 0;
+    g.entry = Array.isArray(prev.entry) ? prev.entry.slice() : emptyEntry();
+    g.dice = g.rolledCount > 0 ? prev.dice.slice() : [0, 0, 0, 0, 0];
+  } else {
+    g.rollsLeft = 3;
+    g.dice = [0, 0, 0, 0, 0];
+    g.rolledCount = 0;
+    g.held = [false, false, false, false, false];
+    g.entry = emptyEntry();
+  }
   g.lastRecord = null;
   return true;
 }
@@ -296,8 +367,23 @@ function sanitizeGame(g) {
   g.rolledCount = clampInt(g.rolledCount, 0, 3, 0);
   g.dice = Array.isArray(g.dice) && g.dice.length === 5 ? g.dice.map((v) => clampInt(v, 0, 6, 0)) : [0, 0, 0, 0, 0];
   g.held = Array.isArray(g.held) && g.held.length === 5 ? g.held.map(Boolean) : [false, false, false, false, false];
+  g.entry = Array.isArray(g.entry) && g.entry.length === 5 ? g.entry.map((v) => clampInt(v, 0, 6, 0)) : emptyEntry();
   g.finished = !!g.finished;
-  g.lastRecord = g.lastRecord && typeof g.lastRecord === 'object' ? g.lastRecord : null;
+  if (g.lastRecord && typeof g.lastRecord === 'object') {
+    const prev = g.lastRecord.prev;
+    if (!prev || typeof prev !== 'object') {
+      // a snapshot from an older build: undo still works, it just clears the turn
+      g.lastRecord.prev = null;
+    } else {
+      prev.dice = Array.isArray(prev.dice) && prev.dice.length === 5 ? prev.dice.map((v) => clampInt(v, 0, 6, 0)) : [0, 0, 0, 0, 0];
+      prev.held = Array.isArray(prev.held) && prev.held.length === 5 ? prev.held.map(Boolean) : [false, false, false, false, false];
+      prev.entry = Array.isArray(prev.entry) && prev.entry.length === 5 ? prev.entry.map((v) => clampInt(v, 0, 6, 0)) : emptyEntry();
+      prev.rollsLeft = clampInt(prev.rollsLeft, 0, 3, 0);
+      prev.rolledCount = clampInt(prev.rolledCount, 0, 3, 0);
+    }
+  } else {
+    g.lastRecord = null;
+  }
   return g;
 }
 
@@ -334,17 +420,21 @@ function loadPrefs() {
     return {
       motion: p.motion !== false,
       haptics: p.haptics === true,
+      // a first-ever visit rolls on the phone, so existing behaviour is the default
+      dice: p.dice === 'table' ? 'table' : 'phone',
       theme: theme === 'auto' ? (p.theme || 'auto') : theme,
     };
-  } catch { return { motion: true, haptics: false, theme }; }
+  } catch { return { motion: true, haptics: false, dice: 'phone', theme }; }
 }
 function savePrefs() {
   try {
-    localStorage.setItem(PREF_KEY, JSON.stringify({ motion: prefs.motion, haptics: prefs.haptics }));
+    localStorage.setItem(PREF_KEY, JSON.stringify({ motion: prefs.motion, haptics: prefs.haptics, dice: prefs.dice }));
     if (prefs.theme === 'light' || prefs.theme === 'dark') localStorage.setItem(THEME_STORE, prefs.theme);
     else localStorage.removeItem(THEME_STORE);
   } catch { /* ignore */ }
 }
+
+const tableMode = () => prefs.dice === 'table';
 
 /* ────────────────────────── dice values (test hook first) ────────────────────────── */
 function nextDieValue() {
@@ -392,23 +482,32 @@ const PIPS = {
 };
 const COORDS = { tl: [22, 22], tm: [22, 50], tr: [22, 78], c: [50, 50], bl: [78, 22], bm: [78, 50], br: [78, 78] };
 
+function pipsInto(host, f, half) {
+  for (const key of PIPS[f]) {
+    const pip = el('span', 'pip');
+    const [y, x] = COORDS[key];
+    pip.style.top = `calc(${y}% - ${half}px)`;
+    pip.style.left = `calc(${x}% - ${half}px)`;
+    host.appendChild(pip);
+  }
+}
+
+/** The six pip layouts of a physical die; CSS reveals the one matching data-value. */
+function facesInto(host, half) {
+  for (let f = 1; f <= 6; f++) {
+    const face = el('span', 'face');
+    face.dataset.face = String(f);
+    pipsInto(face, f, half);
+    host.appendChild(face);
+  }
+}
+
 function buildDie(i) {
   const b = el('button', 'die', 'die');
   b.type = 'button';
   b.dataset.index = String(i);
   b.setAttribute('aria-pressed', 'false');
-  for (let f = 1; f <= 6; f++) {
-    const face = el('span', 'face');
-    face.dataset.face = String(f);
-    for (const key of PIPS[f]) {
-      const pip = el('span', 'pip');
-      const [y, x] = COORDS[key];
-      pip.style.top = `calc(${y}% - 5px)`;
-      pip.style.left = `calc(${x}% - 5px)`;
-      face.appendChild(pip);
-    }
-    b.appendChild(face);
-  }
+  facesInto(b, 5);
   b.addEventListener('click', () => onDieTap(i));
   return b;
 }
@@ -551,8 +650,26 @@ function addPlayerFromInput() {
 }
 
 /* ────────────────────────── game ────────────────────────── */
+let diceEl = null;
+
+/** Which half of the felt tray is live: on-screen dice, or the real-dice keypad. */
+function setTrayMode(table) {
+  $('dice').hidden = table;
+  $('roll-row').hidden = table;
+  $('slots').hidden = !table;
+  $('keypad').hidden = !table;
+  if (table) {
+    $('dice').setAttribute('inert', '');
+    $('roll-row').setAttribute('inert', '');
+  } else {
+    $('dice').removeAttribute('inert');
+    $('roll-row').removeAttribute('inert');
+  }
+}
+
 function renderGame(tumbled) {
   const g = state.game;
+  const table = tableMode();
   const player = currentPlayer(g);
   const card = player.card;
   const rolled = g.rolledCount > 0;
@@ -572,29 +689,38 @@ function renderGame(tumbled) {
   });
   $('current-player').textContent = player.name;
   $('card-title').textContent = `${player.name}’s scorecard`;
-  $('turn-hint').textContent = rolled
-    ? (g.rollsLeft > 0 ? 'Tap a box to lock it in, or roll again.' : 'Last roll — pick a box to pass the phone.')
-    : 'Tap Roll. Tap a die to hold it.';
+  $('turn-hint').textContent = table
+    ? (!rolled ? 'Real dice: tap the five faces you got.'
+      : (entryComplete(g) ? 'Tap the box you want — one tap locks it in.'
+        : 'Get all five faces in, then tap a box.'))
+    : rolled
+      ? (g.rollsLeft > 0 ? 'Tap a box to lock it in, or roll again.' : 'Last roll — pick a box to pass the phone.')
+      : 'Tap Roll. Tap a die to hold it.';
 
-  $('rolls-left').textContent = String(g.rollsLeft);
-  $('roll').disabled = g.finished || g.rollsLeft <= 0;
-  $('roll-label').textContent = rolled
-    ? (g.rollsLeft === 2 ? 'Roll the rest' : `Roll again · ${g.rollsLeft} left`)
-    : 'Roll all five';
+  setTrayMode(table);
 
-  const diceEl = $('dice');
-  diceEl.dataset.armed = rolled ? 'true' : 'false';
-  const faces = rolled ? g.dice : [0, 0, 0, 0, 0];
-  for (let i = 0; i < 5; i++) {
-    const d = diceEl.children[i];
-    const v = faces[i];
-    if (v > 0) d.setAttribute('data-value', String(v));
-    else d.removeAttribute('data-value');
-    d.setAttribute('aria-pressed', g.held[i] ? 'true' : 'false');
-    d.setAttribute('aria-label', rolled
-      ? `Die ${i + 1} showing ${v}${g.held[i] ? ', held' : ''}. Tap to ${g.held[i] ? 'release' : 'hold'}.`
-      : `Die ${i + 1}, not rolled yet`);
-    if (tumbled && tumbled.has(i)) restart(d, 'tumble');
+  if (table) {
+    renderEntry(g);
+  } else {
+    $('rolls-left').textContent = String(g.rollsLeft);
+    $('roll').disabled = g.finished || g.rollsLeft <= 0;
+    $('roll-label').textContent = rolled
+      ? (g.rollsLeft === 2 ? 'Roll the rest' : `Roll again · ${g.rollsLeft} left`)
+      : 'Roll all five';
+
+    diceEl.dataset.armed = rolled ? 'true' : 'false';
+    const faces = rolled ? g.dice : [0, 0, 0, 0, 0];
+    for (let i = 0; i < 5; i++) {
+      const d = diceEl.children[i];
+      const v = faces[i];
+      if (v > 0) d.setAttribute('data-value', String(v));
+      else d.removeAttribute('data-value');
+      d.setAttribute('aria-pressed', g.held[i] ? 'true' : 'false');
+      d.setAttribute('aria-label', rolled
+        ? `Die ${i + 1} showing ${v}${g.held[i] ? ', held' : ''}. Tap to ${g.held[i] ? 'release' : 'hold'}.`
+        : `Die ${i + 1}, not rolled yet`);
+      if (tumbled && tumbled.has(i)) restart(d, 'tumble');
+    }
   }
 
   for (const key of CATEGORIES) {
@@ -606,6 +732,7 @@ function renderGame(tumbled) {
     box.querySelector('[data-testid="score-value"]').textContent = filled
       ? String(card[key])
       : rolled ? String(potential(card, key, dice)) : '–';
+    box.classList.remove('last');
     box.classList.toggle('pickable', pickable);
     box.classList.toggle('pickable-best', pickable && key === best);
     box.classList.toggle('pickable-zero', pickable && potential(card, key, dice) === 0);
@@ -623,16 +750,21 @@ function renderGame(tumbled) {
   const undoBtn = $('undo');
   // Recording always hands the turn over, so this button is nearly always seen by the
   // *next* player while it still reverts the previous player's box. Say whose it is.
-  const undoable = g.lastRecord && !g.finished && !rolled;
+  // A mis-tapped box stays undoable until whoever's turn it became has touched
+  // the turn (rolled a die or entered a face) — real dice at the table means the
+  // mistake is usually spotted a few seconds late.
+  const undoable = !!g.lastRecord && !g.finished && !turnTouched(g);
   undoBtn.classList.toggle('invisible', !undoable);
   undoBtn.setAttribute('aria-disabled', undoable ? 'false' : 'true');
   if (undoable) {
-    const who = g.players[g.lastRecord.playerIndex].name;
+    const rec = g.lastRecord;
+    const who = g.players[rec.playerIndex].name;
     $('undo-who').textContent = who === player.name ? ' yours' : ` ${who}’s`;
     undoBtn.setAttribute('aria-label',
       who === player.name
-        ? `Undo your ${LABEL[g.lastRecord.cat]} (${g.lastRecord.value})`
-        : `Undo ${who}’s ${LABEL[g.lastRecord.cat]} (${g.lastRecord.value}) — it is ${player.name}’s turn now`);
+        ? `Undo your ${LABEL[rec.cat]} (${rec.value})`
+        : `Undo ${who}’s ${LABEL[rec.cat]} (${rec.value}) — it is ${player.name}’s turn now`);
+    if (rec.playerIndex === g.turnIndex) scoreEls[rec.cat].classList.add('last');
   }
 
   renderBoard();
@@ -673,11 +805,9 @@ function renderBoard() {
 }
 
 /* ────────────────────────── actions ────────────────────────── */
-const rolled0 = (g) => g.rolledCount > 0;
-
 function onDieTap(i) {
   const g = state.game;
-  if (!g || g.finished) return;
+  if (!g || g.finished || tableMode()) return;
   if (!toggleHold(g, i)) return;
   save();
   buzz(8);
@@ -686,7 +816,7 @@ function onDieTap(i) {
 
 function onRoll() {
   const g = state.game;
-  if (!g || g.finished || g.rollsLeft <= 0) return;
+  if (!g || g.finished || tableMode() || g.rollsLeft <= 0) return;
   const changed = new Set();
   for (let i = 0; i < 5; i++) if (!g.held[i]) changed.add(i);
   if (!rollDice(g, nextDieValue)) return;
@@ -703,6 +833,7 @@ function onScoreTap(key) {
   if (!g || g.finished) return;
   if (!record(g, key)) return;
   const rec = g.lastRecord;
+  resetEntryFocus(g);
   save();
   buzz(rec.value > 0 ? [12, 40, 16] : 18);
   restart(scoreEls[key], 'just');
@@ -723,7 +854,7 @@ function onScoreTap(key) {
 
 function onUndo() {
   const g = state.game;
-  if (!g || g.finished || rolled0(g) || !g.lastRecord) return;
+  if (!g || g.finished || !g.lastRecord || turnTouched(g)) return;
   if (!undo(g)) return;
   save();
   renderGame();
@@ -736,6 +867,8 @@ function showHandover(text) {
   b.classList.remove('show');
   void b.offsetWidth;
   if (prefs.motion) b.classList.add('show');
+  clearTimeout(showHandover.timer);
+  showHandover.timer = setTimeout(hideHandover, prefs.motion ? 1400 : 2200);
 }
 
 /** A "pass the phone" toast is about a turn that no longer exists once the game
@@ -760,9 +893,9 @@ function yahtzeeMoment(isBonus) {
     $('yah-word').textContent = '';
     $('yah-sub').textContent = '';
   }, 1150);
-  const diceEl = $('dice');
-  for (const d of diceEl.children) restart(d, 'yah-pop');
-  confettiBits(diceEl, 20);
+  const host = tableMode() ? $('slots') : diceEl;
+  for (const d of host.children) restart(d, 'yah-pop');
+  confettiBits(host, 20);
   restart($('turn-banner'), 'passed');
   buzz([18, 60, 18, 60, 34]);
   announce(isBonus ? 'Yahtzee bonus — 100 points!' : 'Yahtzee!');
@@ -878,6 +1011,7 @@ function beginGame(startIndex) {
   state.game = newGame(state.players, startIndex);
   setScreen('game');
   save();
+  resetEntryFocus(state.game);
   renderGame();
   const name = currentPlayer(state.game).name;
   showHandover(`${name} starts — good luck`);
@@ -966,10 +1100,322 @@ function closeSheet() {
   lastFocused?.focus?.();
 }
 
+/* ────────────────────────── the table (glance standings) ────────────────────────── */
+function renderTableSheet() {
+  const g = state.game;
+  if (!g) return;
+  $('table-sub').textContent = g.finished
+    ? `Game over · ${g.players.length} player${g.players.length === 1 ? '' : 's'} · 13 rounds`
+    : `Round ${roundOf(g)} of ${ROUNDS} · ${currentPlayer(g).name} to play`;
+
+  const rows = $('table-rows');
+  rows.textContent = '';
+  standings(g).forEach((row, i) => {
+    const card = g.players[row.index].card;
+    const lower = CATEGORIES.slice(6).reduce((a, k) => a + (card[k] ?? 0), 0);
+    const li = el('li', 'sheet-row');
+    if (i === 0 && row.total > 0) li.classList.add('lead');
+    if (!g.finished && row.index === g.turnIndex) li.classList.add('playing');
+    const rank = el('span', 'sheet-rank');
+    rank.textContent = String(i + 1);
+    const who = el('span', 'sheet-who');
+    const nm = el('span', 'sheet-name');
+    nm.textContent = row.name;
+    const meta = el('span', 'sheet-meta');
+    meta.textContent = `${upperSubtotal(card)} upper${upperBonus(card) ? ' + 35' : ''} · ${lower} lower`
+      + (card.yahtzeeBonus ? ` · +${card.yahtzeeBonus} Yahtzee` : '');
+    who.append(nm, meta);
+    const total = el('span', 'sheet-total');
+    total.textContent = String(row.total);
+    li.append(rank, who, total);
+    rows.appendChild(li);
+  });
+
+  const session = state.session;
+  $('table-session').hidden = !session || session.gamesPlayed < 1;
+  if (session && session.gamesPlayed >= 1) {
+    $('table-games').textContent = String(session.gamesPlayed);
+    const list = $('table-session-rows');
+    list.textContent = '';
+    session.players.forEach((r) => {
+      const li = el('li', 'session-row');
+      const nm = el('span', 'session-name');
+      nm.textContent = r.name;
+      const wins = el('span', 'session-cell');
+      const wlab = el('span');
+      wlab.textContent = 'Wins';
+      const wnum = el('b');
+      wnum.textContent = String(r.wins);
+      wins.append(wlab, wnum);
+      const pts = el('span', 'session-cell');
+      const plab = el('span');
+      plab.textContent = 'Points';
+      const pnum = el('b');
+      pnum.textContent = String(r.points);
+      pts.append(plab, pnum);
+      li.append(nm, wins, pts);
+      list.appendChild(li);
+    });
+  }
+}
+
+function openTableSheet() {
+  lastFocused = document.activeElement;
+  renderTableSheet();
+  $('table-sheet').hidden = false;
+  $('table-close').focus();
+}
+function closeTableSheet() {
+  $('table-sheet').hidden = true;
+  lastFocused?.focus?.();
+}
+
+/* ────────────────────────── real dice at the table ────────────────────────── */
+const slotEls = [];
+const keyEls = [];
+let pendingSlot = -1;
+
+const firstEmptySlot = (g) => g.entry.findIndex((v) => !(v >= 1 && v <= 6));
+const lastFilledSlot = (g) => {
+  for (let i = g.entry.length - 1; i >= 0; i--) if (g.entry[i] >= 1) return i;
+  return -1;
+};
+const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth'];
+
+function buildEntry() {
+  const slots = $('slots');
+  slots.textContent = '';
+  for (let i = 0; i < ENTRY_LEN; i++) {
+    const b = el('button', 'slot', 'entry-slot');
+    b.type = 'button';
+    b.dataset.index = String(i);
+    b.dataset.filled = 'false';
+    const n = el('span', 'slot-n');
+    n.textContent = String(i + 1);
+    b.appendChild(n);
+    const face = el('span', 'die');
+    face.setAttribute('aria-hidden', 'true');
+    facesInto(face, 5);
+    b.appendChild(face);
+    b.addEventListener('click', () => onSlotTap(i));
+    slots.appendChild(b);
+    slotEls[i] = b;
+  }
+  const keys = $('keys');
+  keys.textContent = '';
+  for (let f = 1; f <= 6; f++) {
+    const b = el('button', 'key', 'entry-key');
+    b.type = 'button';
+    b.dataset.face = String(f);
+    const face = el('span', 'kface');
+    pipsInto(face, f, 4);
+    b.appendChild(face);
+    const count = el('span', 'key-count');
+    b.appendChild(count);
+    b.addEventListener('click', () => onKeyTap(f));
+    keys.appendChild(b);
+    keyEls[f] = b;
+  }
+}
+
+function renderEntry(g, popSlot) {
+  const entered = entryCount(g);
+  const complete = entryComplete(g);
+  const target = pendingSlot >= 0 ? pendingSlot : firstEmptySlot(g);
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  for (const v of g.entry) counts[v] += 1;
+
+  for (let i = 0; i < ENTRY_LEN; i++) {
+    const b = slotEls[i];
+    const face = g.entry[i];
+    const filled = face >= 1;
+    b.dataset.filled = filled ? 'true' : 'false';
+    b.dataset.pending = pendingSlot === i ? 'true' : 'false';
+    const die = b.lastElementChild;
+    if (filled) die.setAttribute('data-value', String(face));
+    else die.removeAttribute('data-value');
+    b.setAttribute('aria-label', filled
+      ? `Die ${i + 1} showing ${face}. Tap to change it, tap again to clear it.`
+      : `Die ${i + 1}, empty. Tap to choose its value.`);
+    if (popSlot === i && filled) restart(die, 'slot-set');
+  }
+
+  for (let f = 1; f <= 6; f++) {
+    const b = keyEls[f];
+    b.dataset.count = String(counts[f]);
+    b.querySelector('.key-count').textContent = counts[f] ? String(counts[f]) : '';
+    b.setAttribute('aria-label', `Enter a ${f}`
+      + (counts[f] ? `, ${counts[f]} of these in already` : '')
+      + (target >= 0 ? `, goes in die ${target + 1}` : ', all five dice are already in'));
+  }
+
+  const hint = $('entry-hint');
+  hint.textContent = complete
+    ? 'All five in — tap a box to record. Tap a die above to fix a face.'
+    : entered
+      ? `${entered} of 5 in — ${pendingSlot >= 0 ? `die ${pendingSlot + 1} selected` : 'tap the next face'} · you can record once all five are in`
+      : 'Roll at the table, then tap the five faces you got. Order does not matter.';
+  $('entry-count').textContent = `${entered} of 5`;
+  $('entry-count').dataset.ready = complete ? 'true' : 'false';
+}
+
+function onKeyTap(face) {
+  const g = state.game;
+  if (!g || g.finished || !tableMode()) return;
+  const target = pendingSlot >= 0 ? pendingSlot : firstEmptySlot(g);
+  if (target < 0) {
+    announce('All five dice are already in. Tap one of them to change it.');
+    restart($('entry-hint'), 'nudge');
+    return;
+  }
+  setEntryFace(g, target, face);
+  pendingSlot = -1;
+  save();
+  buzz(10);
+  renderGame();
+  renderEntry(g, target);
+  const left = ENTRY_LEN - entryCount(g);
+  announce(`${face} in die ${target + 1}. ${left ? `${left} to go.` : 'All five in — tap a box to record.'}`);
+  if (!left) {
+    restart($('slots'), 'ready');
+    if (isYahtzee(g.dice) && currentPlayer(g).card.yahtzee == null) {
+      setTimeout(() => yahtzeeMoment(false), 200);
+    }
+  }
+}
+
+function onSlotTap(i) {
+  const g = state.game;
+  if (!g || g.finished || !tableMode()) return;
+  const filled = g.entry[i] >= 1;
+  if (pendingSlot === i) {
+    if (!filled) { pendingSlot = -1; }
+    else {
+      setEntryFace(g, i, 0);
+      pendingSlot = -1;
+      save();
+      buzz(14);
+      renderGame();
+      renderEntry(g);
+      announce(`Cleared die ${i + 1}. Tap a face to put a new one in.`);
+      return;
+    }
+  } else {
+    pendingSlot = i;
+  }
+  renderEntry(g);
+  announce(filled
+    ? `Die ${i + 1} selected, showing ${g.entry[i]}. Tap a face to replace it, or tap it again to clear.`
+    : `Die ${ORDINAL[i]} selected. Tap the face you rolled.`);
+}
+
+function onEntryLast() {
+  const g = state.game;
+  if (!g || g.finished || !tableMode()) return;
+  const i = lastFilledSlot(g);
+  if (i < 0) {
+    announce('No dice entered yet.');
+    return;
+  }
+  pendingSlot = i;
+  setEntryFace(g, i, 0);
+  save();
+  buzz(14);
+  renderGame();
+  renderEntry(g);
+  announce(`Took die ${i + 1} back out. Enter it again if that was a mistake.`);
+}
+
+function onEntryClear() {
+  const g = state.game;
+  if (!g || g.finished || !tableMode()) return;
+  if (entryCount(g) === 0) {
+    announce('Nothing entered yet.');
+    return;
+  }
+  clearEntry(g);
+  pendingSlot = 0;
+  save();
+  buzz([10, 30, 10]);
+  renderGame();
+  renderEntry(g);
+  announce('Dice cleared. Enter all five faces again.');
+}
+
+/** A new turn forgets the selection so the next tap fills die 1 again. */
+const resetEntryFocus = (g) => { pendingSlot = entryComplete(g) ? -1 : Math.max(firstEmptySlot(g), 0); };
+
+/* ────────────────────────── dice mode ────────────────────────── */
+const DICE_NOTE = {
+  phone: 'The phone rolls and tumbles five dice on screen.',
+  table: 'Roll the real dice on the table, then tap the five faces you got. No rolling on screen.',
+};
+
+/** Carrying a half-played turn across a mode switch, without touching any score. */
+function transferTurn(g, mode) {
+  if (!g || g.finished) return;
+  if (mode === 'table') {
+    if (entryCount(g) === 0 && g.rolledCount > 0) {
+      g.entry = g.dice.slice();
+      syncEntry(g);
+    }
+  } else if (g.rolledCount === 0 && entryCount(g) > 0) {
+    // faces typed but never all five: on the phone this turn is a roll instead
+    clearEntry(g);
+  }
+  resetEntryFocus(g);
+}
+
+function setDiceMode(mode) {
+  if (mode !== 'phone' && mode !== 'table') return;
+  if (prefs.dice === mode) { closeDiceSheet(); return; }
+  const before = hasGame() ? state.game.players.map((p) => JSON.stringify(p.card)).join('|') : '';
+  prefs.dice = mode;
+  savePrefs();
+  if (hasGame()) transferTurn(state.game, mode);
+  const after = hasGame() ? state.game.players.map((p) => JSON.stringify(p.card)).join('|') : '';
+  if (before !== after) throw new Error('mode switch changed a scorecard');
+  save();
+  renderDiceMode();
+  if (hasGame() && !state.game.finished) renderGame();
+  announce(mode === 'table'
+    ? 'Real dice at the table. Nobody’s scores changed.'
+    : 'Dice on this phone. Nobody’s scores changed.');
+}
+
+function renderDiceMode() {
+  const table = tableMode();
+  document.documentElement.classList.toggle('mode-table', table);
+  const pairs = [['dice-phone', false], ['dice-table', true], ['dice-sheet-phone', false], ['dice-sheet-table', true]];
+  for (const [id, isTable] of pairs) {
+    const b = $(id);
+    b.setAttribute('aria-checked', String(table === isTable));
+  }
+  $('dice-mode-note').textContent = table ? DICE_NOTE.table : DICE_NOTE.phone;
+  $('dice-sheet-note').textContent = table ? DICE_NOTE.table : DICE_NOTE.phone;
+  const btn = $('dice-game');
+  btn.setAttribute('aria-label', (table ? 'Dice are real dice at the table' : 'Dice come from this phone')
+    + '. Change where the dice come from.');
+  btn.dataset.mode = table ? 'table' : 'phone';
+  $('dice-mode-inline').textContent = table ? 'Real dice' : 'On phone';
+}
+
+function openDiceSheet() {
+  lastFocused = document.activeElement;
+  renderDiceMode();
+  $('dice-sheet').hidden = false;
+  $('dice-sheet-close').focus();
+}
+function closeDiceSheet() {
+  $('dice-sheet').hidden = true;
+  lastFocused?.focus?.();
+}
+
 /* ────────────────────────── boot ────────────────────────── */
 function boot() {
-  const diceEl = $('dice');
+  diceEl = $('dice');
   for (let i = 0; i < 5; i++) diceEl.appendChild(buildDie(i));
+  buildEntry();
   buildCard();
 
   $('add-form').addEventListener('submit', (e) => {
@@ -987,8 +1433,27 @@ function boot() {
   $('how-sheet').addEventListener('click', (e) => {
     if (e.target.dataset.close || e.target.classList.contains('sheet-backdrop')) closeSheet();
   });
+  $('dice-phone').addEventListener('click', () => setDiceMode('phone'));
+  $('dice-table').addEventListener('click', () => setDiceMode('table'));
+  $('dice-game').addEventListener('click', openDiceSheet);
+  $('dice-sheet-phone').addEventListener('click', () => setDiceMode('phone'));
+  $('dice-sheet-table').addEventListener('click', () => setDiceMode('table'));
+  $('dice-sheet-close').addEventListener('click', closeDiceSheet);
+  $('dice-sheet').addEventListener('click', (e) => {
+    if (e.target.dataset.close || e.target.classList.contains('sheet-backdrop')) closeDiceSheet();
+  });
+  $('entry-last').addEventListener('click', onEntryLast);
+  $('entry-clear').addEventListener('click', onEntryClear);
+  $('table-game').addEventListener('click', openTableSheet);
+  $('table-close').addEventListener('click', closeTableSheet);
+  $('table-sheet').addEventListener('click', (e) => {
+    if (e.target.dataset.close || e.target.classList.contains('sheet-backdrop')) closeTableSheet();
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('how-sheet').hidden) closeSheet();
+    if (e.key !== 'Escape') return;
+    if (!$('dice-sheet').hidden) closeDiceSheet();
+    else if (!$('table-sheet').hidden) closeTableSheet();
+    else if (!$('how-sheet').hidden) closeSheet();
   });
   $('theme-setup').addEventListener('click', toggleTheme);
   $('theme-game').addEventListener('click', toggleTheme);
@@ -999,6 +1464,7 @@ function boot() {
   });
 
   applyTheme();
+  renderDiceMode();
   $('haptics-label').textContent = prefs.haptics ? 'Haptics on' : 'Haptics off';
   $('motion-label').textContent = prefs.motion ? 'Animations on' : 'Animations off';
 
@@ -1007,6 +1473,7 @@ function boot() {
     else { setScreen('over'); renderOver(false); }
   } else if (hasGame()) {
     setScreen('game');
+    resetEntryFocus(state.game);
     renderGame();
   } else {
     state.game = null;

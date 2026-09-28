@@ -24,14 +24,20 @@ const addPlayers = async (page, names) => {
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=die]')].every(d => d.getAttribute('data-value')));
   await page.getByTestId('score-yahtzee').dblclick();
   await page.waitForTimeout(400);
-  const st = await page.evaluate(() => ({
-    current: document.querySelector('[data-testid=current-player]').textContent,
-    yahState: document.querySelector('[data-testid=score-yahtzee]').dataset.state,
-    yahVal: document.querySelector('[data-testid=score-yahtzee] [data-testid=score-value]').textContent,
-    total: document.querySelector('[data-testid=total]').textContent,
-    rolls: document.querySelector('[data-testid=rolls-left]').textContent,
-  }));
-  console.log('double-tap record:', JSON.stringify(st), '-> one box, next player Ana? ', st.current === 'Ben' && st.yahVal === '50');
+  // the card on screen is the NEXT player's, so check the board and the stored cards
+  const st = await page.evaluate(() => {
+    const g = JSON.parse(localStorage.getItem('yahtzee.state.v1')).game;
+    return {
+      current: document.querySelector('[data-testid=current-player]').textContent,
+      board: [...document.querySelectorAll('[data-testid=scoreboard-total]')].map((e) => e.textContent).join(','),
+      anaYahtzee: g.players[0].card.yahtzee, benYahtzee: g.players[1].card.yahtzee,
+      filled: g.players[0].card.chance === null && g.players[0].card.yahtzee !== null,
+      rolls: document.querySelector('[data-testid=rolls-left]').textContent,
+    };
+  });
+  const oneBox = st.anaYahtzee === 50 && st.benYahtzee === null && st.current === 'Ben' && st.board === '50,0';
+  console.log('double-tap record:', JSON.stringify(st), '-> exactly one box, once:', oneBox);
+  if (!oneBox) throw new Error('double-tap recorded twice');
   await ctx.close();
 }
 
@@ -52,6 +58,9 @@ const addPlayers = async (page, names) => {
     hidden: document.querySelector('#undo').classList.contains('invisible'),
   }));
   console.log('undo on next player screen:', JSON.stringify(u), '-> attributed:', /Ana/.test(u.text) && !u.hidden);
+  // the window stays open across the hand-over and closes only when Ben touches it
+  await page.reload(); await page.waitForTimeout(250);
+  console.log('  window survives a reload:', await page.evaluate(() => !document.querySelector('#undo').classList.contains('invisible')));
   await page.getByTestId('roll').click(); await page.waitForTimeout(200);
   console.log('  window closes on next roll:', await page.evaluate(() => document.querySelector('#undo').classList.contains('invisible')));
   await ctx.close();
