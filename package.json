@@ -1,0 +1,16 @@
+{
+  "name": "camp-yahtzee",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "icons": "node scripts/gen-icons.mjs",
+    "build": "node build.mjs",
+    "serve": "node serve.mjs public 3000",
+    "test:unit": "node --test tests/",
+    "test": "node build.mjs && npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

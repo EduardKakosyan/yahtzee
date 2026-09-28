@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camp Yahtzee</title>
+<meta name="description" content="Yahtzee for one phone passed around a camp table. Official rules, 1–8 players, works offline.">
+<meta id="theme-color" name="theme-color" content="#f5ecdb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Yahtzee">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+<script>
+  // Decide the theme before first paint so there is never a flash of the wrong colors.
+  try {
+    var t = localStorage.getItem('yahtzee.theme.v1');
+    t = t === '"light"' ? 'light' : t === '"dark"' ? 'dark' : null;
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+</script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ══════════════════════ SETUP ══════════════════════ -->
+  <section id="screen-setup" class="screen setup" data-testid="setup" aria-labelledby="setup-title">
+    <header class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="46" height="46" focusable="false">
+          <path d="M32 6 56 18 32 30 8 18 32 6Z" fill="currentColor" opacity=".9"/>
+          <path d="M8 18v22l24 12V30L8 18Z" fill="currentColor" opacity=".55"/>
+          <path d="M56 18v22L32 52V30l24-12Z" fill="currentColor" opacity=".75"/>
+          <g fill="var(--bg)">
+            <circle cx="32" cy="12.5" r="2.6"/><circle cx="22" cy="17.5" r="2.6"/><circle cx="42" cy="17.5" r="2.6"/>
+            <circle cx="18" cy="30" r="2.4"/><circle cx="24" cy="41" r="2.4"/>
+            <circle cx="45" cy="27" r="2.4"/><circle cx="40" cy="41" r="2.4"/>
+          </g>
+        </svg>
+      </span>
+      <h1 id="setup-title" class="brand-title">Camp<br>Yahtzee</h1>
+      <p class="brand-sub">One phone, one table, thirteen rounds.<br>Official rules, no signal needed.</p>
+    </header>
+
+    <div class="setup-body">
+      <form class="add-form" id="add-form" novalidate>
+        <label class="field-label" for="player-name">Player name</label>
+        <div class="field-row">
+          <input id="player-name" class="name-input" type="text" autocomplete="off"
+                 autocapitalize="words" spellcheck="false" maxlength="16" enterkeyhint="done" placeholder="Try “Sam”">
+          <button type="submit" class="btn btn-add" data-testid="add-player" id="add-player" aria-label="Add player">
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+            </svg>
+          </button>
+        </div>
+        <p class="field-note" id="field-note" role="status">Up to 8 players — turns go in the order you add them.</p>
+      </form>
+
+      <ul class="chips" id="chips" aria-label="Players, in seating order"></ul>
+
+      <div class="setup-actions">
+        <button type="button" class="btn btn-primary" data-testid="start-game" id="start-game" disabled>
+          <span id="start-game-label">Start game</span>
+        </button>
+      </div>
+
+      <div class="setup-tools">
+        <button type="button" class="btn btn-ghost" id="how-setup" data-testid="how-to-play">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M9.7 9.3c0-1.4 1-2.4 2.4-2.4s2.4 1 2.3 2.3c0 1.6-2.3 1.8-2.3 3.4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <circle cx="12.1" cy="16.4" r="1.2" fill="currentColor"/>
+          </svg>
+          <span>How to play</span>
+        </button>
+        <button type="button" class="btn btn-ghost" id="theme-setup">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor"/>
+          </svg>
+          <span id="theme-label-setup">Dark mode</span>
+        </button>
+        <button type="button" class="btn btn-ghost" id="haptics-setup">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <rect x="7.5" y="2.6" width="9" height="18.8" rx="2.6" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M3 9v6M21 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span id="haptics-label">Haptics off</span>
+        </button>
+        <button type="button" class="btn btn-ghost" id="motion-setup">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path d="M4 17c3.2 0 3.2-10 6.4-10S13.6 17 16.8 17 20 12 20 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+          <span id="motion-label">Animations on</span>
+        </button>
+      </div>
+
+      <div class="evening" id="evening" hidden>
+        <h2 class="evening-title">Tonight’s tally</h2>
+        <div id="evening-rows"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ GAME ══════════════════════ -->
+  <section id="screen-game" class="screen game" data-testid="game" hidden>
+    <header class="game-top">
+      <div class="round-wrap">
+        <p class="round" data-testid="round" id="round">Round 1 of 13</p>
+        <div class="round-pips" id="round-pips" aria-hidden="true"></div>
+      </div>
+      <div class="game-top-actions">
+        <button type="button" class="btn btn-icon" id="how-game" data-testid="how-to-play" aria-label="How to play">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M9.7 9.3c0-1.4 1-2.4 2.4-2.4s2.4 1 2.3 2.3c0 1.6-2.3 1.8-2.3 3.4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <circle cx="12.1" cy="16.4" r="1.2" fill="currentColor"/>
+          </svg>
+        </button>
+        <button type="button" class="btn btn-icon" id="theme-game" aria-label="Switch color theme">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor"/>
+          </svg>
+          <span class="sr-only" id="theme-label-game">Dark mode</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="turn" id="turn-banner">
+      <p class="turn-kicker">Now playing</p>
+      <p class="turn-name" data-testid="current-player" id="current-player" aria-live="polite">—</p>
+      <p class="turn-hint" id="turn-hint">Tap Roll. Tap a die to hold it.</p>
+    </div>
+
+    <div class="felt">
+      <div class="dice" id="dice" role="group" aria-label="Dice"></div>
+      <div class="roll-row">
+        <button type="button" class="btn btn-roll" data-testid="roll" id="roll"><span id="roll-label">Roll all five</span></button>
+        <p class="rolls">Rolls<b data-testid="rolls-left" id="rolls-left">3</b></p>
+      </div>
+    </div>
+
+    <div class="card-head">
+      <h2 class="card-title" id="card-title">Scorecard</h2>
+      <button type="button" class="btn btn-undo" id="undo" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M4 10h9.6a5.4 5.4 0 1 1 0 10.8H8.4" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M7.6 6.2 3.8 10l3.8 3.8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Undo</span>
+      </button>
+    </div>
+
+    <div class="card" id="card"></div>
+
+    <div class="totals" id="totals-strip" role="group" aria-label="Running totals for this player">
+      <p class="tot"><span class="tot-label">Upper</span><b data-testid="upper-subtotal" id="upper-subtotal">0</b></p>
+      <p class="tot"><span class="tot-label">Bonus</span><b data-testid="upper-bonus" id="upper-bonus">0</b></p>
+      <p class="tot"><span class="tot-label">Yahtzee</span><b data-testid="yahtzee-bonus" id="yahtzee-bonus">0</b></p>
+      <p class="tot tot-total"><span class="tot-label">Total</span><b data-testid="total" id="total">0</b></p>
+    </div>
+
+    <div class="board-tools">
+      <h2 class="board-title">The table</h2>
+      <p class="board-note">Set the phone down — totals stay up.</p>
+    </div>
+    <ul class="board" data-testid="scoreboard" id="scoreboard"></ul>
+  </section>
+
+  <!-- ══════════════════════ GAME OVER ══════════════════════ -->
+  <section id="screen-over" class="screen over" data-testid="game-over" hidden>
+    <div class="win" id="win">
+      <div class="confetti" id="confetti"></div>
+      <p class="win-kicker" id="win-kicker">Winner</p>
+      <p class="win-name" data-testid="winner" id="winner" aria-live="polite">—</p>
+    </div>
+
+    <ol class="final" id="final" aria-label="Final standings"></ol>
+
+    <div class="evening evening-over">
+      <h2 class="evening-title">Tonight’s tally <span class="games">Games <b data-testid="games-played" id="games-played">1</b></span></h2>
+      <ul class="session" id="session"></ul>
+    </div>
+
+    <div class="over-actions">
+      <button type="button" class="btn btn-primary" data-testid="play-again" id="play-again">
+        <span id="play-again-label">Play again</span>
+      </button>
+      <p class="over-note" id="play-again-note"></p>
+      <button type="button" class="btn btn-ghost" data-testid="change-players" id="change-players">Change players</button>
+    </div>
+  </section>
+
+  <div class="handover" id="handover" aria-hidden="true"></div>
+  <div class="yah-flash" id="yah-flash" hidden aria-hidden="true">
+    <p class="yah-word" id="yah-word">Yahtzee!</p>
+    <p class="yah-sub" id="yah-sub"></p>
+  </div>
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
+</div>
+
+<!-- ══════════════════════ HOW TO PLAY ══════════════════════ -->
+<div class="sheet-wrap" id="how-sheet" hidden>
+  <div class="sheet-backdrop" data-close="1"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="how-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="how-title" class="sheet-title">How to play</h2>
+    <div class="sheet-body">
+      <p><b>The game.</b> 13 rounds; everyone takes one turn each round, in seating order. A turn is up to
+        <b>three rolls</b>. After the first and second roll you may hold any dice — held dice keep their value,
+        tap one again to release it. After one, two or three rolls you <b>must</b> score in exactly one open box,
+        and that score is final.</p>
+      <h3>Upper section</h3>
+      <p>Ones to Sixes: add up the dice showing that number. Reach <b>63</b> in the six upper boxes for a
+        <b>35-point bonus</b>.</p>
+      <h3>Lower section</h3>
+      <ul class="rules">
+        <li><b>Three of a kind</b> — all five dice added, if at least three match; else 0.</li>
+        <li><b>Four of a kind</b> — all five dice added, if at least four match; else 0.</li>
+        <li><b>Full house</b> — three of one number and two of another: <b>25</b>. Five of a kind is <i>not</i> a full house.</li>
+        <li><b>Small straight</b> — four in sequence: <b>30</b>.</li>
+        <li><b>Large straight</b> — five in sequence: <b>40</b>.</li>
+        <li><b>Yahtzee</b> — five of a kind: <b>50</b>.</li>
+        <li><b>Chance</b> — the sum of all five dice.</li>
+      </ul>
+      <h3>Yahtzee bonus &amp; the Joker</h3>
+      <p>Once your Yahtzee box holds <b>50</b>, every further Yahtzee wins a <b>100-point bonus</b> (a box holding 0
+        earns none). The Joker then says where it goes: <b>1)</b> your upper box for that number if it is still open —
+        mandatory, scored as the sum of the dice; <b>2)</b> otherwise any open lower box, with full house 25, small
+        straight 30, large straight 40 and the rest the sum of the dice; <b>3)</b> if that upper box and every lower
+        box are filled, you write <b>0</b> in an open upper box of your choice.</p>
+      <h3>Winning</h3>
+      <p>Grand total = upper section + 35 bonus + lower section + Yahtzee bonuses. Highest total wins; a tie means
+        everyone tied wins. <b>Play again</b> keeps the same friends, rotates who starts and keeps counting for the evening.</p>
+    </div>
+    <button type="button" class="btn btn-primary" id="how-close">Got it</button>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

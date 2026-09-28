@@ -1,0 +1,35 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch();
+const p = await b.newPage();
+const errs = [];
+p.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+p.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
+await p.goto('http://localhost:3210/');
+await p.waitForTimeout(400);
+console.log('setup visible', await p.getByTestId('setup').isVisible());
+console.log('start disabled', await p.getByTestId('start-game').isDisabled());
+await p.getByLabel('Player name', {exact:true}).fill('Ana');
+await p.getByTestId('add-player').click();
+await p.getByTestId('add-player').click();
+await p.getByLabel('Player name', {exact:true}).fill('Ben');
+await p.getByTestId('add-player').click();
+console.log('chips', await p.getByTestId('player-chip').count());
+console.log('start disabled after', await p.getByTestId('start-game').isDisabled());
+await p.getByTestId('start-game').click();
+console.log('game visible', await p.getByTestId('game').isVisible());
+console.log('current', await p.getByTestId('current-player').textContent());
+console.log('round', await p.getByTestId('round').textContent());
+await p.evaluate(() => { window.__yahtzeeDice = [3,3,3,5,2]; });
+await p.getByTestId('roll').click();
+await p.waitForTimeout(300);
+console.log('dice', await p.getByTestId('die').evaluateAll(e=>e.map(x=>x.getAttribute('data-value'))));
+console.log('rolls-left', await p.getByTestId('rolls-left').textContent());
+for (const c of ['ones','threes','yahtzee','chance']) {
+  const b2 = p.getByTestId('score-'+c);
+  console.log(c, await b2.getAttribute('data-state'), await b2.getByTestId('score-value').textContent(), 'disabled', await b2.isDisabled());
+}
+await p.getByTestId('score-threes').click();
+console.log('after record current', await p.getByTestId('current-player').textContent(), 'round', await p.getByTestId('round').textContent());
+console.log('total', await p.getByTestId('total').textContent(), 'board', await p.getByTestId('scoreboard-total').allTextContents());
+console.log('errors:', errs);
+await b.close();
