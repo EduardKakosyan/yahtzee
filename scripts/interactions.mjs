@@ -35,6 +35,28 @@ const addPlayers = async (page, names) => {
   await ctx.close();
 }
 
+// 1b) Undo is attributed: recording hands the turn over, so the next player is the
+//     one who sees this button while it still reverts the previous player's box.
+{
+  const { ctx, page } = await mk();
+  await addPlayers(page, ['Ana', 'Ben']);
+  await page.evaluate(() => { window.__yahtzeeDice = [6, 6, 6, 6, 6]; });
+  await page.getByTestId('roll').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=die]')].every(d => d.getAttribute('data-value')));
+  await page.getByTestId('score-yahtzee').click();
+  await page.waitForTimeout(300);
+  const u = await page.evaluate(() => ({
+    current: document.querySelector('[data-testid=current-player]').textContent,
+    text: document.querySelector('#undo').textContent.replace(/\s+/g, ' ').trim(),
+    aria: document.querySelector('#undo').getAttribute('aria-label'),
+    hidden: document.querySelector('#undo').classList.contains('invisible'),
+  }));
+  console.log('undo on next player screen:', JSON.stringify(u), '-> attributed:', /Ana/.test(u.text) && !u.hidden);
+  await page.getByTestId('roll').click(); await page.waitForTimeout(200);
+  console.log('  window closes on next roll:', await page.evaluate(() => document.querySelector('#undo').classList.contains('invisible')));
+  await ctx.close();
+}
+
 // 2) Tapping dice after the final roll (rolls-left = 0, must score)
 {
   const { ctx, page } = await mk();
