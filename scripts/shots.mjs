@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
-const BASE = process.env.SHOT_URL || 'http://localhost:3210/';
+const BASE = process.env.SHOT_URL || 'http://localhost:3000/';
 const CATS = ['ones','twos','threes','fours','fives','sixes','three-kind','four-kind','full-house','small-straight','large-straight','yahtzee','chance'];
 const ANA = [[6,6,6,1,2],[5,5,5,1,2],[4,4,4,1,2],[3,3,3,1,2],[2,2,2,1,3],[1,1,1,2,3],[3,3,3,4,5],[2,2,2,2,5],[2,2,3,3,3],[1,2,3,4,6],[2,3,4,5,6],[5,5,5,5,5],[6,6,5,4,1]];
 const BEN = Array.from({length:13},()=>[1,2,3,4,6]);

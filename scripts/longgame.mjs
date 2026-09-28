@@ -3,7 +3,7 @@
 import { chromium } from '@playwright/test';
 import { CATEGORIES, UPPER, scoreFor, allowedBoxes, potential, jokerRule, upperSubtotal, upperBonus, grandTotal } from '../src/rules.js';
 
-const BASE = process.env.SHOT_URL || 'http://localhost:3210/';
+const BASE = process.env.SHOT_URL || 'http://localhost:3000/';
 const NAMES = ['Ana', 'Ben', 'Chloé'];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });

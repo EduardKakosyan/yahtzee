@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { chromium } from '@playwright/test';
-const TARGET = process.env.APP_URL || 'http://localhost:3210';
+const TARGET = process.env.APP_URL || 'http://localhost:3000';
 const up = new URL(TARGET);
 const server = http.createServer((req, res) => {
   const fwd = http.request({ hostname: up.hostname, port: up.port, path: req.url, method: req.method,

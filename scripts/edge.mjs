@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import { CATEGORIES, allowedBoxes, potential, grandTotal, scoreFor, UPPER, LOWER } from '../src/rules.js';
-const BASE = process.env.SHOT_URL || 'http://localhost:3210/';
+const BASE = process.env.SHOT_URL || 'http://localhost:3000/';
 const browser = await chromium.launch();
 
 async function fullGame(page) {
