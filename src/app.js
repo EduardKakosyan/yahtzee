@@ -362,8 +362,20 @@ function renderGame(tumbled) {
   $('upper-bonus').textContent = String(upperBonus(card));
   $('yahtzee-bonus').textContent = String(card.yahtzeeBonus || 0);
   $('total').textContent = String(grandTotal(card));
-  $('undo').classList.toggle('invisible', !(g.lastRecord && !g.finished && !rolled));
-  $('undo').setAttribute('aria-disabled', g.lastRecord && !g.finished && !rolled ? 'false' : 'true');
+  const undoBtn = $('undo');
+  // Recording always hands the turn over, so this button is nearly always seen by the
+  // *next* player while it still reverts the previous player's box. Say whose it is.
+  const undoable = g.lastRecord && !g.finished && !rolled;
+  undoBtn.classList.toggle('invisible', !undoable);
+  undoBtn.setAttribute('aria-disabled', undoable ? 'false' : 'true');
+  if (undoable) {
+    const who = g.players[g.lastRecord.playerIndex].name;
+    $('undo-who').textContent = who === player.name ? ' yours' : ` ${who}’s`;
+    undoBtn.setAttribute('aria-label',
+      who === player.name
+        ? `Undo your ${LABEL[g.lastRecord.cat]} (${g.lastRecord.value})`
+        : `Undo ${who}’s ${LABEL[g.lastRecord.cat]} (${g.lastRecord.value}) — it is ${player.name}’s turn now`);
+  }
 
   renderBoard();
 }

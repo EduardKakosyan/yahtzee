@@ -127,6 +127,7 @@ b { font-weight: 800; }
   font-size: 14px; font-weight: 800; padding: 8px 12px;
 }
 .btn-undo.invisible { visibility: hidden; }
+.undo-who { color: var(--ink-2); }
 .card-title { flex: 1 1 auto; }
 .btn-mini {
   min-height: 44px; padding: 8px 12px; background: transparent;
@@ -187,7 +188,15 @@ b { font-weight: 800; }
 .chip-remove:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .chips-empty { color: var(--ink-2); font-size: 16px; padding: 10px 2px; }
 
-.setup-actions { margin-top: 14px; }
+/* With a full table the roster is taller than the phone, so Start must stay in
+   reach. The fade is a ::before (not a background on the bar) so it never joins
+   any text element's ancestor chain. */
+.setup-actions { margin-top: 14px; position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 6; }
+.setup-actions::before {
+  content: ''; position: absolute; inset: -22px -12px -10px; z-index: -1;
+  background: linear-gradient(180deg, transparent, var(--bg) 58%);
+  pointer-events: none;
+}
 .setup-tools { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
 
 .evening {
@@ -307,7 +316,7 @@ b { font-weight: 800; }
 .rolls b { display: block; font-size: 26px; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 2px 5px; }
-.card-title { font-size: 17px; font-weight: 900; letter-spacing: -0.01em; }
+.card-title { font-size: 17px; font-weight: 900; letter-spacing: -0.01em; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .card { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; align-items: start; }
 .card-col { display: flex; flex-direction: column; gap: 4px; }

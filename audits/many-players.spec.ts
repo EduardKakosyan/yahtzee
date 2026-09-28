@@ -7,6 +7,8 @@
 import { test, expect } from '@playwright/test';
 import { collectVisual } from '../checks/visual';
 
+type State = 'setup' | 'turn' | 'over';
+
 const NAMES = ['Ana', 'Ben', 'Chloé', 'Dev', 'Mari', 'Sam', 'Tomas', 'Yuki'];
 const DICE = [[6,6,6,1,2],[5,5,5,1,2],[4,4,4,1,2],[3,3,3,1,2],[2,2,2,1,3],[1,1,1,2,3],[3,3,3,4,5],[2,2,2,2,5],[2,2,3,3,3],[1,2,3,4,6],[2,3,4,5,6],[5,5,5,5,5],[6,6,5,4,1]];
 
@@ -14,7 +16,7 @@ test('8-player standings stay clean in both themes and both phones', async ({ br
   test.setTimeout(600_000);
   for (const vp of [{ width: 390, height: 844 }, { width: 375, height: 667 }]) {
     for (const theme of ['light', 'dark'] as const) {
-      for (const state of (process.env.STATES ? process.env.STATES.split(',') : ['turn', 'over']) as ('turn'|'over')[]) {
+      for (const state of (process.env.STATES ? process.env.STATES.split(',') : ['setup', 'turn', 'over']) as State[]) {
         const ctx = await browser.newContext({ viewport: vp, colorScheme: theme });
         const page = await ctx.newPage();
         await page.addInitScript((t) => localStorage.setItem('yahtzee.theme.v1', t), theme);
@@ -25,7 +27,15 @@ test('8-player standings stay clean in both themes and both phones', async ({ br
           await page.getByLabel('Player name', { exact: true }).fill(n);
           await page.getByTestId('add-player').click();
         }
-        await page.getByTestId('start-game').click();
+        if (state === 'setup') {
+          // the roster is taller than the phone: Start must stay tappable
+          const cta = page.getByTestId('start-game');
+          await expect(cta).toBeInViewport();
+          await expect(cta).toBeEnabled();
+          await expect(page.getByTestId('player-chip')).toHaveCount(NAMES.length);
+        } else {
+          await page.getByTestId('start-game').click();
+        }
         if (state === 'over') {
           // finish the game for everyone: always score the first open legal box
           for (let round = 0; round < 13; round++) {
@@ -40,7 +50,7 @@ test('8-player standings stay clean in both themes and both phones', async ({ br
           await expect(page.getByTestId('game-over')).toBeVisible();
           await expect(page.locator('[data-testid="final-row"]')).toHaveCount(NAMES.length);
           await page.waitForTimeout(400);
-        } else {
+        } else if (state === 'turn') {
           await page.evaluate(() => { (window as any).__yahtzeeDice = [2, 2, 3, 3, 5]; });
           await page.getByTestId('roll').click();
           await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=die]')].every((d) => d.getAttribute('data-value')));
@@ -50,7 +60,9 @@ test('8-player standings stay clean in both themes and both phones', async ({ br
         const geo = await page.evaluate(() => {
           const w = document.documentElement;
           const rows = document.querySelectorAll('[data-testid="scoreboard-row"], [data-testid="final-row"]').length;
-          return { docW: w.scrollWidth, innerW: innerWidth, docH: w.scrollHeight, rows };
+          const cta = document.querySelector('#start-game');
+          const ctaVisible = cta ? cta.getBoundingClientRect().bottom <= innerHeight : null;
+          return { docW: w.scrollWidth, innerW: innerWidth, docH: w.scrollHeight, rows, ctaVisible };
         });
         const flags: string[] = [];
         if (rep.text.length) flags.push('CONTRAST ' + JSON.stringify(rep.text.slice(0, 4)));
@@ -58,6 +70,7 @@ test('8-player standings stay clean in both themes and both phones', async ({ br
         if (rep.overflow.length) flags.push('OVERFLOW ' + JSON.stringify(rep.overflow.slice(0, 4)));
         if (rep.coverage.length) flags.push('COVERAGE ' + JSON.stringify(rep.coverage.slice(0, 4)));
         console.log(`\n[8p ${vp.width}x${vp.height} ${theme}] ${state} ${JSON.stringify(geo)}\n  ` + (flags.length ? flags.join('\n  ') : 'CLEAN'));
+        expect(flags, `${state} at ${vp.width}x${vp.height} ${theme}`).toEqual([]);
         await page.screenshot({ path: `shots/8p-${vp.width}-${theme}-${state}.png`, fullPage: true });
         await ctx.close();
       }
