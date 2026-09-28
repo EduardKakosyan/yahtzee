@@ -362,7 +362,8 @@ function renderGame(tumbled) {
   $('upper-bonus').textContent = String(upperBonus(card));
   $('yahtzee-bonus').textContent = String(card.yahtzeeBonus || 0);
   $('total').textContent = String(grandTotal(card));
-  $('undo').hidden = !(g.lastRecord && !g.finished && !rolled);
+  $('undo').classList.toggle('invisible', !(g.lastRecord && !g.finished && !rolled));
+  $('undo').setAttribute('aria-disabled', g.lastRecord && !g.finished && !rolled ? 'false' : 'true');
 
   renderBoard();
 }
@@ -402,6 +403,8 @@ function renderBoard() {
 }
 
 /* ────────────────────────── actions ────────────────────────── */
+const rolled0 = (g) => g.rolledCount > 0;
+
 function onDieTap(i) {
   const g = state.game;
   if (!g || g.finished) return;
@@ -450,7 +453,8 @@ function onScoreTap(key) {
 
 function onUndo() {
   const g = state.game;
-  if (!g || !undo(g)) return;
+  if (!g || g.finished || rolled0(g) || !g.lastRecord) return;
+  if (!undo(g)) return;
   save();
   renderGame();
   announce('Score undone.');

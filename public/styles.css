@@ -126,6 +126,8 @@ b { font-weight: 800; }
   background: transparent; border-color: var(--line); box-shadow: none;
   font-size: 14px; font-weight: 800; padding: 8px 12px;
 }
+.btn-undo.invisible { visibility: hidden; }
+.card-title { flex: 1 1 auto; }
 .btn-mini {
   min-height: 44px; padding: 8px 12px; background: transparent;
   border: 2px solid transparent; box-shadow: none;
@@ -523,16 +525,19 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
   .add-form { padding: 10px; }
   .chip { min-height: 50px; }
   .round-pips { display: none; }
-  .turn { padding: 6px 11px 7px; }
-  .turn-name { font-size: 27px; }
+  .turn { padding: 5px 11px 6px; }
+  .turn-kicker { font-size: 11px; letter-spacing: 0.14em; }
+  .turn-name { font-size: 28px; }
   .turn-hint { display: none; }
-  .felt { margin-top: 6px; padding: 7px 6px 6px; }
+  .game-top { padding-top: 0; }
+  .felt { margin-top: 5px; padding: 7px 6px 6px; }
   .dice { gap: 6px; }
   .die { width: 46px; height: 46px; }
   .roll-row { margin-top: 7px; }
   .btn-roll { min-height: 46px; font-size: 17px; }
-  .card-head { margin: 6px 2px 3px; }
+  .card-head { margin: 5px 2px 3px; }
   .card-title { font-size: 15px; }
+  .card-section { display: none; }
   .card { gap: 3px 6px; }
   .card-col { gap: 3px; }
   .card-section { font-size: 10px; }
