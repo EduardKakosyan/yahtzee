@@ -1258,6 +1258,7 @@ function renderEntry(g, popSlot) {
   }
 
   const hint = $('entry-hint');
+  hint.dataset.ready = complete ? 'true' : 'false';
   hint.textContent = complete
     ? 'All five in — tap a box to record. Tap a die above to fix a face.'
     : entered

@@ -677,7 +677,9 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
 @media (max-height: 720px) {
   /* real-dice mode has no roll row, so the tray earns back the space it needs:
      the gold "Now playing" hint already says what to do, the pill says 5 of 5. */
-  html.mode-table .entry-hint { display: none; }
+  /* on a short phone the hint only earns its row while the five faces are still
+     coming in; once they are all in, the lit boxes say what to do */
+  html.mode-table .entry-hint[data-ready='true'] { display: none; }
   html.mode-table .keypad { margin-top: 5px; }
   html.mode-table .felt { padding-bottom: 5px; }
   .app { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
@@ -703,7 +705,6 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
   .keys { gap: 5px; }
   .key { min-height: 48px; }
   .entry-bar { gap: 5px; }
-  .entry-hint { display: none; }
   .roll-row { margin-top: 7px; }
   .btn-roll { min-height: 46px; font-size: 17px; }
   .card-head { margin: 5px 2px 3px; }
