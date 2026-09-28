@@ -1,6 +1,6 @@
 /* Camp Yahtzee service worker: precache everything, serve cache-first offline.
    CACHE_NAME carries the build hash, so an update activates on the next launch. */
-const VERSION = '5e6490a5f9d7';
+const VERSION = '118e2d6d3531';
 const CACHE = `yahtzee-${VERSION}`;
 const ASSETS = [
   './',

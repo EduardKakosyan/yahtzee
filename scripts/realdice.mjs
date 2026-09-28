@@ -250,19 +250,26 @@ async function playPartialAndCheckResume(page, names) {
   const boardMid = await page.getByTestId('scoreboard-total').allTextContents();
   if (boardMid.join() !== boardBefore.join()) throw new Error('mode switch moved a score');
   if (!await page.getByTestId('roll').isVisible()) throw new Error('phone tray missing after switch');
-  await page.evaluate(() => { window.__yahtzeeDice = [1, 2, 3, 4, 5]; });
+  await page.evaluate(() => { window.__yahtzeeDice = [1, 1, 1, 3, 6]; });
   await page.getByTestId('roll').click();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=die]')].every((d) => d.getAttribute('data-value')));
-  await page.getByTestId('score-large-straight').click();    // 40 for Ben, on the phone
 
+  // the other direction: a phone roll that has not been scored yet carries into the
+  // entry, so the faces already on the felt become the faces the player reports
   await page.locator('#dice-game').click();
   await page.locator('#dice-sheet-table').click();
   await page.locator('#dice-sheet-close').click();
+  const carried = await page.evaluate(() => JSON.parse(localStorage.getItem('yahtzee.state.v1')).game.entry.join(','));
+  if (carried !== '1,1,1,3,6') throw new Error(`phone roll not carried into the entry: ${carried}`);
+  if (await pill(page) !== '5 of 5') throw new Error('carried entry not marked complete');
+  if ((await enabledBoxes(page)).length === 0) throw new Error('carried turn cannot be scored');
   if (await page.getByTestId('roll').isVisible()) throw new Error('table tray missing after switch back');
-  const boardAfter = await page.getByTestId('scoreboard-total').allTextContents();
-  if (boardAfter.join() !== '25,40') throw new Error(`scores wrong after switching: ${boardAfter}`);
+  await page.getByTestId('score-three-kind').click();           // 12 for Ben, recorded in table mode
+  await page.waitForTimeout(120);
   if (await pill(page) !== '0 of 5') throw new Error('entry not reset for the new turn');
-  console.log(`mode switch mid-game ✓ board=${boardAfter} phone-roll scored 40, phone state at switch=${JSON.stringify(phoneState)}`);
+  const boardAfter = await page.getByTestId('scoreboard-total').allTextContents();
+  if (boardAfter.join() !== '25,12') throw new Error(`scores wrong after switching: ${boardAfter}`);
+  console.log(`mode switch mid-game ✓ board=${boardAfter} carried-entry=${carried} phone state at switch=${JSON.stringify(phoneState)}`);
   await ctx.close();
 }
 
