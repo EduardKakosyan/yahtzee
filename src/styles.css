@@ -348,14 +348,16 @@ b { font-weight: 800; }
 .box.just { animation: box-locked 0.45s ease both; }
 @keyframes box-locked { 35% { transform: scale(1.05); } }
 
-.totals { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+/* One row of four, always: flex-basis 0 (not %) so the gaps can never push the
+   fourth chip onto a second line and steal half a row of the turn. */
+.totals { display: flex; flex-wrap: nowrap; gap: 5px; margin-top: 8px; }
 .tot {
-  flex: 1 1 24%; min-width: 0; display: flex; flex-direction: column; gap: 0;
-  padding: 4px 5px; border-radius: 11px; text-align: center;
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 0;
+  padding: 3px 3px; border-radius: 11px; text-align: center;
   background: var(--card-2); border: 1px solid var(--line);
 }
-.tot-label { font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
-.tot b { font-size: 21px; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.tot-label { font-size: 11px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+.tot b { font-size: 21px; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .tot-total { background: var(--gold-bg); border-color: var(--gold-ink); color: var(--gold-ink); }
 .tot-total .tot-label { color: var(--gold-ink); opacity: 0.8; }
 .tot-total b { color: var(--gold-ink); }
@@ -525,9 +527,9 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
   .add-form { padding: 10px; }
   .chip { min-height: 50px; }
   .round-pips { display: none; }
-  .turn { padding: 5px 11px 6px; }
+  .turn { padding: 4px 11px 5px; }
   .turn-kicker { font-size: 11px; letter-spacing: 0.14em; }
-  .turn-name { font-size: 28px; }
+  .turn-name { font-size: 27px; }
   .turn-hint { display: none; }
   .game-top { padding-top: 0; }
   .felt { margin-top: 5px; padding: 7px 6px 6px; }
@@ -538,7 +540,6 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
   .card-head { margin: 5px 2px 3px; }
   .card-title { font-size: 15px; }
   .card-section { display: none; }
-  .card { gap: 3px 6px; }
   .card-col { gap: 3px; }
   .card-section { font-size: 10px; }
   .box { min-height: 44px; padding: 4px 8px; }

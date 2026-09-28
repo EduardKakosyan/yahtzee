@@ -468,6 +468,14 @@ function showHandover(text) {
   if (prefs.motion) b.classList.add('show');
 }
 
+/** A "pass the phone" toast is about a turn that no longer exists once the game
+ *  ends, and `animation ... both` would otherwise leave it parked over the reveal. */
+function hideHandover() {
+  const b = $('handover');
+  b.classList.remove('show');
+  b.textContent = '';
+}
+
 function yahtzeeMoment(isBonus) {
   const flash = $('yah-flash');
   $('yah-word').textContent = 'Yahtzee!';
@@ -516,6 +524,7 @@ function finishGame() {
     ? mergeSession(state.session, state.game)
     : sessionFromGame(state.game);
   save();
+  hideHandover();
   renderOver(true);
   setScreen('over');
 }
