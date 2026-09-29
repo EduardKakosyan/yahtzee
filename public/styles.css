@@ -480,6 +480,7 @@ b { font-weight: 800; }
 }
 .slot[data-filled='true'] .slot-n { display: none; }
 .slot .die { position: absolute; inset: 0; display: none; border-radius: 15px; }
+.slot .die .pip { width: 8px; height: 8px; }
 .slot[data-filled='true'] .die {
   display: block; box-shadow: 0 3px 0 var(--die-2), 0 8px 14px -8px rgba(0, 0, 0, 0.6);
 }
@@ -502,10 +503,13 @@ b { font-weight: 800; }
 .key:active { transform: translateY(2px); }
 .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 /* The pip area stops where the cap strip begins: nothing is ever painted on a pip,
-   so a key is always a faithful picture of the die lying on the table. */
-.key .kface { position: absolute; inset: 5px 5px 21px; }
+   so a key is always a faithful picture of the die lying on the table. Inside it the
+   pips sit on a centred SQUARE, the way a die face is — a 52x56 key leaves a 42x30
+   area, and spreading five pips over that squashed them until they nearly touched. */
+.key .kface { position: absolute; inset: 5px 5px 21px; display: grid; place-items: center; }
+.key .kface-sq { position: relative; height: 100%; aspect-ratio: 1; max-width: 100%; }
 .key .kface .pip {
-  position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  position: absolute; width: 8px; height: 8px; border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #7a6d5b, var(--pip) 72%);
 }
 .klabel {
@@ -725,7 +729,8 @@ html.no-motion .yah-flash { animation-duration: 0.7s; }
   .slot[data-filled='false']::before { border-radius: 9px; }
   .keypad { margin-top: 6px; gap: 5px; }
   .keys { gap: 5px; }
-  .key { min-height: 56px; }
+  /* tall enough that the pip square reaches the key's full width */
+  .key { min-height: 68px; }
   .entry-bar { gap: 5px; }
   .roll-row { margin-top: 7px; }
   .btn-roll { min-height: 46px; font-size: 17px; }

@@ -110,6 +110,7 @@ for (const vp of VIEWPORTS) {
           const r = k.getBoundingClientRect();
           const face = k.querySelector('.kface').getBoundingClientRect();
           const label = k.querySelector('.klabel').getBoundingClientRect();
+          const sq = k.querySelector('.kface-sq').getBoundingClientRect();
           const pips = [...k.querySelectorAll('.kface .pip')].map((p) => {
             const b = p.getBoundingClientRect();
             return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width, bottom: b.bottom };
@@ -120,6 +121,9 @@ for (const vp of VIEWPORTS) {
             countText: k.querySelector('.kcount').textContent.trim(),
             key: { x: r.x, y: r.y, w: r.width, h: r.height },
             faceBox: { x: face.x, y: face.y, w: face.width, h: face.height },
+            sq: { x: sq.x, y: sq.y, w: sq.width, h: sq.height },
+            pipW: pips.length ? pips[0].w : 0,
+            centres: pips,
             label: { x: label.x, y: label.y, w: label.width, h: label.height },
             pips,
           };
@@ -142,6 +146,13 @@ for (const vp of VIEWPORTS) {
         }
         if (k.count === '0' && k.countText !== '') fail(`${tag} ${phase}: key ${k.face} shows "${k.countText}" at count 0`);
         if (k.count !== '0' && k.countText !== `×${k.count}`) fail(`${tag} ${phase}: key ${k.face} count text "${k.countText}" != ×${k.count}`);
+        if (Math.abs(k.sq.w - k.sq.h) > 1) fail(`${tag} ${phase}: key ${k.face}: the pip area is ${Math.round(k.sq.w)}x${Math.round(k.sq.h)}, not square`);
+        for (let i = 0; i < k.centres.length; i++) {
+          for (let j = i + 1; j < k.centres.length; j++) {
+            const d = Math.hypot(k.centres[i].x - k.centres[j].x, k.centres[i].y - k.centres[j].y);
+            if (d < k.pipW + 3) fail(`${tag} ${phase}: key ${k.face}: two pips are ${d.toFixed(1)}px apart (pip ${k.pipW}px) — they read as one blob`);
+          }
+        }
         if (k.label.y < k.key.y || k.label.y + k.label.h > k.key.y + k.key.h + 0.6) fail(`${tag} ${phase}: key ${k.face}: the strip is clipped by the key`);
         if (k.label.x < k.key.x - 0.5 || k.label.x + k.label.w > k.key.x + k.key.w + 0.5) fail(`${tag} ${phase}: key ${k.face}: the strip spills sideways`);
       }
@@ -153,11 +164,11 @@ for (const vp of VIEWPORTS) {
       const rowBox = await page.locator('.keys').boundingBox();
       const scale = row.width / rowBox.width;
       for (const k of geo) {
-        const found = blobs(row, rowBox, k.faceBox, scale);
+        const found = blobs(row, rowBox, k.sq, scale);
         const want = EXPECT[k.face];
         const rel = found.map((b) => [
-          ((b.cx - k.faceBox.x) / k.faceBox.w) * 100,
-          ((b.cy - k.faceBox.y) / k.faceBox.h) * 100,
+          ((b.cx - k.sq.x) / k.sq.w) * 100,
+          ((b.cy - k.sq.y) / k.sq.h) * 100,
         ]);
         const dump = JSON.stringify(rel.map((r) => r.map((v) => Math.round(v))));
         if (found.length !== want.length) {
@@ -175,11 +186,11 @@ for (const vp of VIEWPORTS) {
           }
         }
         for (const b of found) {
-          if (b.h > k.faceBox.h * 0.6) fail(`${tag} ${phase}: key ${k.face}: dark region ${Math.round(b.w)}x${Math.round(b.h)} is not a pip`);
+          if (b.h > k.sq.h * 0.6) fail(`${tag} ${phase}: key ${k.face}: dark region ${Math.round(b.w)}x${Math.round(b.h)} is not a pip`);
         }
       }
       const line = geo.map((k) => `${k.face}:${k.pips.length}${k.count !== '0' ? `x${k.count}` : ''}`).join(' ');
-      console.log(`  faces ${line} · key ${Math.round(geo[0].key.w)}x${Math.round(geo[0].key.h)} · strip ${Math.round(geo[0].label.h)}px · scale ${scale}`);
+      console.log(`  faces ${line} · key ${Math.round(geo[0].key.w)}x${Math.round(geo[0].key.h)} · pip area ${Math.round(geo[0].sq.w)}² · strip ${Math.round(geo[0].label.h)}px`);
       if (geo[0].key.h < 44) fail(`${tag} ${phase}: key height ${Math.round(geo[0].key.h)} < 44`);
       if (geo[0].key.w < 44) fail(`${tag} ${phase}: key width ${Math.round(geo[0].key.w)} < 44`);
       const spill = await page.evaluate(() => [...document.querySelectorAll('body *')]
@@ -200,6 +211,26 @@ for (const vp of VIEWPORTS) {
       if (s.filled === 'true' && (!s.painted || s.w < 20)) fail(`${tag}: a filled slot paints no die face (${s.w}x${s.h})`);
     }
     console.log(`  slots ${slotInfo.map((s) => `${s.filled === 'true' ? '▪' : '▫'}${Math.round(s.key.w)}`).join('')}`);
+    {
+      const shot = `${SHOT_DIR}/${tag}-slots.png`;
+      await page.locator('#slots').screenshot({ path: shot });
+      const img = PNG.read(shot);
+      const box = await page.locator('#slots').boundingBox();
+      const sc = img.width / box.width;
+      const faces = await page.evaluate(() => [...document.querySelectorAll('[data-testid="entry-slot"]')].map((s) => {
+        const d = s.querySelector('.die').getBoundingClientRect();
+        return { v: s.querySelector('.die').dataset.value || '', x: d.x, y: d.y, w: d.width, h: d.height };
+      }));
+      for (const f of faces) {
+        if (!f.v) continue;
+        // crop inside the die's rounded corners: outside them the dark tray hole
+        // shows through and would count as one more dark region
+        const found = blobs(img, box, { x: f.x + 4, y: f.y + 4, w: f.w - 8, h: f.h - 8 }, sc);
+        if (found.length !== EXPECT[+f.v].length) {
+          fail(`${tag}: the slot showing ${f.v} paints ${found.length} separate pips in ${Math.round(f.w)}px — they are merging`);
+        }
+      }
+    }
     await ctx.close();
   }
 }

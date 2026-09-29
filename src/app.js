@@ -912,9 +912,14 @@ function buildEntry() {
     b.dataset.face = String(f);
     // face on top, its number and count in a strip UNDER it: nothing may ever sit
     // on a pip, or the key stops being a faithful picture of the die on the table.
+    // face on top, its number and count in a strip UNDER it: nothing may ever sit
+    // on a pip, or the key stops being a faithful picture of the die on the table.
+    // The pip area itself is square (a die face is), so the pips never crowd.
     const face = el('span', 'kface');
     face.setAttribute('aria-hidden', 'true');
-    pipsInto(face, f, 4);
+    const square = el('span', 'kface-sq');
+    pipsInto(square, f, 4);
+    face.appendChild(square);
     b.appendChild(face);
     const label = el('span', 'klabel');
     label.setAttribute('aria-hidden', 'true');
