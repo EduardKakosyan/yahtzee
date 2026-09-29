@@ -1,0 +1,40 @@
+criteria:
+  - key: players-and-turns
+    description: Players are added (1-8, no blanks or duplicates) and removed in setup, and turns pass around the table in seating order, round by round, with a live scoreboard
+    test: players.spec.ts
+
+  - key: dice-and-rolls
+    description: Up to three rolls a turn, dice can be held between rolls, scoring needs a roll, a recorded box is final, and each turn starts fresh
+    test: dice.spec.ts
+
+  - key: official-scoring
+    description: Every box scores by the official rules (upper section, 3 and 4 of a kind, full house 25, straights 30 and 40, Yahtzee 50, chance) and the upper bonus is 35 at 63
+    test: scoring.spec.ts
+
+  - key: yahtzee-bonus-and-joker
+    description: Extra Yahtzees earn 100 each when the Yahtzee box holds 50, and are placed by the official forced Joker rules
+    test: joker.spec.ts
+
+  - key: games-and-session
+    description: A game ends after 13 rounds with the winner(s) and standings; Play again keeps the players, rotates the starting player and keeps a running session tally of wins and points
+    test: game-and-session.spec.ts
+
+  - key: resume-after-reload
+    description: Reloading mid-turn resumes exactly where the table was (players, turn, dice, holds, rolls left, scores)
+    test: persistence.spec.ts
+
+  - key: iphone-home-screen-and-offline
+    description: The app can be added to an iPhone home screen (manifest, icons, relative URLs) and works with no connection after one visit
+    test: offline-install.spec.ts
+
+  - key: phone-readability
+    description: On 390x844 and 375x667 phones, in setup, at the start of a turn, mid-turn and at game over, all text has enough contrast, every control is at least 44x44, nothing scrolls sideways and the background covers the screen
+    test: phone-visuals.spec.ts
+
+  - key: fun-at-the-camp-table
+    description: Passing one iPhone around a table of friends feels great - always obvious whose turn it is, big satisfying dice and rolls, the scorecard easy to read and hard to mis-tap, readable in sunlight and by a campfire
+    kind: human_judgment
+
+  - key: looks-and-feel
+    description: The app looks distinctive and polished - a cooler, more playful take than a plain scoresheet - on a phone first, and presentable on a tablet or desktop
+    kind: human_judgment
