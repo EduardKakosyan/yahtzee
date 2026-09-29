@@ -38,6 +38,7 @@ const measure = (page) => page.evaluate(() => {
     cta: box('#start-game'), turn: box('.turn'), felt: box('.felt'),
     card: box('#card'), totals: box('.totals'), board: box('#scoreboard'),
     roll: box('[data-testid=roll]'),
+    keypad: box('#keypad'), firstBox: box('.box'),
     undoShown: !!document.querySelector('#undo') && !document.querySelector('#undo').classList.contains('invisible'),
   };
 });
@@ -83,6 +84,27 @@ for (const vp of VIEWPORTS) {
     check(`undo ${vp.width}x${vp.height} n=${names.length}: shown and no spill`,
       after.undoShown && after.docW <= after.innerW && after.spill.length === 0,
       `shown=${after.undoShown} docW=${after.docW}/${after.innerW} ${after.spill}`);
+
+    // ---- real dice at the table: the keypad is the thumb's whole world ----
+    // same roster, same game: switch dice mode the way a player would mid-game
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.locator('#dice-game').click();
+    await page.locator('#dice-sheet-table').click();
+    await page.locator('#dice-sheet-close').click();
+    await page.waitForTimeout(200);
+    const empty = await measure(page);
+    check(`table ${vp.width}x${vp.height} n=${names.length}: keypad above the fold`,
+      empty.keypad.bottom <= empty.innerH, `keypad.bottom=${empty.keypad.bottom}/${empty.innerH}`);
+    // the scorecard is a deliberate scroll in this mode, but it must be a short one
+    check(`table ${vp.width}x${vp.height} n=${names.length}: the first box is in reach`,
+      empty.firstBox.top < empty.innerH, `firstBox.top=${empty.firstBox.top}/${empty.innerH}`);
+    check(`table ${vp.width}x${vp.height} n=${names.length}: no horizontal spill`,
+      empty.docW <= empty.innerW && empty.spill.length === 0, `docW=${empty.docW}/${empty.innerW} ${empty.spill}`);
+    for (const f of [4, 4, 4, 5, 6]) await page.locator(`[data-testid="entry-key"][data-face="${f}"]`).click();
+    await page.waitForTimeout(160);
+    const full = await measure(page);
+    check(`table ${vp.width}x${vp.height} n=${names.length}: no spill with five faces in`,
+      full.docW <= full.innerW && full.spill.length === 0, `docW=${full.docW}/${full.innerW} ${full.spill}`);
     await ctx.close();
   }
 }

@@ -15,7 +15,9 @@ node build.mjs || { echo "build failed"; exit 1; }
 run "rules unit + oracle (7776 rolls)" node --test tests/rules.test.js tests/rules-oracle.test.js
 run "contract suite"                    npx playwright test
 run "own visual audit"                  npx playwright test --config playwright.audit.config.ts
-run "layout fit (3p/8p, both phones)"   node scripts/fitturn.mjs
+run "layout fit (3p/8p, both phones, both dice modes)" node scripts/fitturn.mjs
+run "keypad faces, counted pixel by pixel" node scripts/keypad.mjs
+run "hand-over note and Undo label"     node scripts/handover.mjs
 run "sub-path hosting"                  node scripts/subpath.mjs
 run "offline + home screen"             node scripts/offline.mjs
 run "service worker update path"        node scripts/swupdate.mjs
