@@ -134,6 +134,56 @@ for (const mode of ['phone', 'table']) {
   }
 }
 
+/* The operator's rule: a mis-tapped box stays undoable until whoever's turn it
+ * became has TOUCHED the turn — real dice at the table means the mistake is usually
+ * spotted a few seconds late, by the previous player, from across the table. */
+for (const mode of ['phone', 'table']) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(URL);
+  if (mode === 'table') await page.getByTestId('dice-table').click();
+  for (const n of NAMES) {
+    await page.getByLabel('Player name', { exact: true }).fill(n);
+    await page.getByTestId('add-player').click();
+  }
+  await page.getByTestId('start-game').click();
+  if (mode === 'phone') {
+    await page.evaluate(() => { window.__yahtzeeDice = [3, 3, 3, 4, 5]; });
+    await page.getByTestId('roll').click();
+  } else {
+    for (const f of [3, 3, 3, 4, 5]) await page.locator(`[data-testid="entry-key"][data-face="${f}"]`).click();
+  }
+  await page.waitForTimeout(320);
+  await page.locator('[data-testid="score-three-kind"]').click();
+  await page.waitForTimeout(120);
+  const offered = () => page.evaluate(() => !document.querySelector('#undo').classList.contains('invisible'));
+  const label = () => page.evaluate(() => document.querySelector('#undo-txt').textContent.trim());
+  if (!(await offered())) fail(`${mode}: Undo vanished straight after the hand-over`);
+  // the next player idles, scrolls the board, reloads — Undo must survive all of it
+  await page.waitForTimeout(1700);
+  await page.evaluate(() => scrollTo(0, 400));
+  await page.waitForTimeout(120);
+  await page.reload();
+  await page.waitForTimeout(320);
+  if (!(await offered())) fail(`${mode}: Undo did not survive an idle + scroll + reload on the next player's turn`);
+  if (!/3 of a kind \(18\)/.test(await label())) fail(`${mode}: Undo label after reload is "${await label()}"`);
+  // the next player taps the board — that is not touching the turn
+  await page.locator('#table-game').click();
+  await page.locator('#table-close').click();
+  await page.waitForTimeout(150);
+  if (!(await offered())) fail(`${mode}: looking at the standings took the Undo away`);
+  // now they start their own turn: the window closes
+  if (mode === 'phone') {
+    await page.getByTestId('roll').click();
+    if (await offered()) fail(`${mode}: Undo survived the next player ROLLING`);
+  } else {
+    await page.locator('[data-testid="entry-key"][data-face="2"]').click();
+    if (await offered()) fail(`${mode}: Undo survived the next player ENTERING a face`);
+  }
+  console.log(`[${mode}] undo window: offered across idle/scroll/reload/standings, closed on their first input`);
+  await ctx.close();
+}
+
 /* long names + 8 players: the label has to survive the worst case */
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({ viewport: vp });

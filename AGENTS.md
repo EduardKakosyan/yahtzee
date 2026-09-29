@@ -58,6 +58,31 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
 14. **`.btn`'s `display:inline-flex` beats the `hidden` attribute.** Hide helper buttons with
     the `.invisible` class (`visibility:hidden`), which also keeps layout stable.
 
+## Faces must be faithful (the operator's blocker)
+21. **A badge on a keypad key is a pip to the player.** The per-face count used to sit
+    in the key's top-right corner — exactly the top-right pip's place — so the 4 key
+    read as a three and the 6 as a five. Nothing may ever be painted over a pip: the
+    number and count live in a strip UNDER the face, and show nothing at count 0.
+22. **A die face is square.** `.key .kface-sq` is a centred square; on the SE a 52x56
+    key otherwise squashed the pip grid to 42x30 and the 5's pips came within 0.6px of
+    touching. Keypad/slot pips are 8px so every pip keeps clear air at the smallest size.
+23. `scripts/keypad.mjs` *looks* at the app: it decodes the screenshot (scripts/png.mjs),
+    thresholds the dark pips out of the cream face, counts connected components and
+    matches their centres to the pip grid. CSS reasoning missed this bug; pixels didn't.
+    Its crop must be the LAYOUT box — a held die is rotated, so its bounding box spills
+    onto the dark felt and reads as one extra blob.
+
+## The hand-over note (operator point 2)
+24. It lives INSIDE the `.felt`, absolutely positioned over the dice/slots row
+    (`positionHandover`), so it can only ever cover dice that are already spent. Anything
+    `position:fixed` ends up over somebody's score or header icon, at any size. It holds
+    full opacity (no fade-out frame for the contrast tool to catch) and `#screen-game`'s
+    `pointerdown` hides it, so it steps aside the moment the new player reaches for a key
+    — in table mode it would otherwise sit exactly on the slots they are about to fill.
+25. **Undo says the whole thing** ("Undo Ana's 3 of a kind (18)"). `.card-head.has-undo`
+    hides the "Ana's scorecard" title so the button owns the row's full width; the label
+    then shrinks itself to 11px rather than ellipsising (a truncated Undo is the vagueness
+    the label exists to remove). `scripts/handover.mjs` asserts `scrollWidth <= clientWidth`.
 ## Two dice modes (the operator's most important path)
 - `prefs.dice` is `'phone'` (default, so every contract check behaves as before) or
   `'table'`. Real-dice state lives in the ENGINE (`g.entry` + `setEntryFace` /
