@@ -234,6 +234,59 @@ for (const vp of VIEWPORTS) {
     await ctx.close();
   }
 }
+/* A held die gets an accent ring and a corner flag. The flag used to be a count
+   disc in the keypad and hid a pip there; prove it never hides one here either. */
+for (const [w, h] of [[390, 844], [375, 667]]) {
+  for (const theme of ['light', 'dark']) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: theme, deviceScaleFactor: 2 });
+    const page = await ctx.newPage();
+    await page.addInitScript((t) => localStorage.setItem('yahtzee.theme.v1', t), theme);
+    await page.goto(URL);
+    for (const n of NAMES) {
+      await page.getByLabel('Player name', { exact: true }).fill(n);
+      await page.getByTestId('add-player').click();
+    }
+    await page.getByTestId('start-game').click();
+    await page.evaluate(() => { window.__yahtzeeDice = [6, 5, 1, 6, 3]; });
+    await page.getByTestId('roll').click();
+    await page.waitForTimeout(420);
+    for (const i of [0, 1]) await page.locator('[data-testid="die"]').nth(i).click();
+    await page.waitForTimeout(120);
+    const shot = `${SHOT_DIR}/${w}-${theme}-held.png`;
+    await page.locator('#dice').screenshot({ path: shot });
+    const img = PNG.read(shot);
+    const box = await page.locator('#dice').boundingBox();
+    const sc = img.width / box.width;
+    const held = await page.evaluate(() => [...document.querySelectorAll('[data-testid="die"]')]
+      .filter((d) => d.getAttribute('aria-pressed') === 'true')
+      .map((d) => {
+        // layout offsets, not getBoundingClientRect: a held die is rotated, so its
+        // bounding box sticks out onto the dark felt and reads as one more dark blob
+        let x = 0, y = 0;
+        for (let n = d; n && n.id !== 'dice'; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+        return { v: +d.dataset.value, x, y, w: d.offsetWidth, h: d.offsetHeight };
+      }));
+    for (const d of held) {
+      // d.x/d.y are offsets inside #dice, and the screenshot starts at #dice.
+      // Assert every pip is PAINTED at its place (a hidden pip is the failure we
+      // care about) rather than counting blobs: a held die sits at an angle, so the
+      // dark felt shows through at one corner and would count as an extra blob.
+      const crop = { x: d.x + 4, y: d.y + 4, w: d.w - 8, h: d.h - 8 };
+      const found = blobs(img, { x: 0, y: 0 }, crop, sc);
+      const pipPx = 10 * sc;
+      const pips = found.filter((b) => b.w > pipPx * 0.45 && b.h > pipPx * 0.45 && b.w < pipPx * 2.2 && b.h < pipPx * 2.2);
+      for (const [ey, ex] of EXPECT[d.v]) {
+        const want = { cx: crop.x + (ex / 100) * crop.w, cy: crop.y + (ey / 100) * crop.h };
+        if (!pips.some((b) => Math.abs(b.cx - want.cx) < 10 && Math.abs(b.cy - want.cy) < 10)) {
+          fail(`${w}-${theme}: the held die showing ${d.v} paints no pip at ${ey}/${ex} — the hold flag is eating it`);
+        }
+      }
+    }
+    console.log(`[${w}-${theme}] held dice ${held.map((d) => `${d.v}:${'ok'}`).join(' ')} paint all their pips`);
+    await ctx.close();
+  }
+}
+
 await browser.close();
 console.log(failures ? `\nKEYPAD PROBE: ${failures} FAILURE(S)` : '\nKEYPAD PROBE: every key paints its true face — both phones, both themes, counted and uncounted');
 process.exit(failures ? 1 : 0);
