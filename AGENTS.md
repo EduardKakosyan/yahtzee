@@ -58,6 +58,54 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
 14. **`.btn`'s `display:inline-flex` beats the `hidden` attribute.** Hide helper buttons with
     the `.invisible` class (`visibility:hidden`), which also keeps layout stable.
 
+## Two dice modes (the operator's most important path)
+- `prefs.dice` is `'phone'` (default, so every contract check behaves as before) or
+  `'table'`. Real-dice state lives in the ENGINE (`g.entry` + `setEntryFace` /
+  `clearEntry` / `syncEntry`), not the UI, so scoring, Joker and bonuses are shared
+  and the entry resumes with the saved game for free. `syncEntry` sets
+  `dice/rolledCount=1/rollsLeft=0` only when all five faces are in, so "nothing
+  recordable before 5/5" falls out of the existing `rolledCount` gate.
+- In table mode the tray swaps `#dice` + `#roll-row` for `#slots` + `#keypad`
+  (`setTrayMode`). Hidden halves get `inert` too, and `[hidden] { display:none !important }`
+  is global — `.btn`'s `display:inline-flex` otherwise beats `hidden`.
+- Undo restores the WHOLE turn (`g.lastRecord.prev` = dice/held/rollsLeft/rolledCount/entry)
+  and stays offered until the next player *touches* the turn (`turnTouched`), in both modes.
+- Switching modes carries a half-played turn across (`transferTurn`) and is guarded by an
+  assertion that no card string changed.
+
+## Verifying
+`bash scripts/verify.sh` (or `npm run verify`) runs everything: unit+oracle tests, the
+contract suite, my visual audit, layout fit (both phones, both dice modes, 3 and 8
+players), the keypad face probe, the hand-over/Undo probe, sub-path hosting, offline,
+SW-update path, interaction hazards, edge cases, three whole phone-mode games and whole
+table-mode games (3 and 8 players) re-checked against the engine.
+It expects the built app on `$APP_URL` (default http://localhost:3000).
+`audits/many-players.spec.ts` covers the 8-player extremes the contract suite never reaches.
+Probe scripts live in `scripts/` and take `SHOT_URL`/`APP_URL`; they must be self-contained
+(no leftover background servers on fixed ports — that already rotted once).
+
+## Design system
+Warm-tin "camp tin" theme, `--ink` on `--bg`, gold accent band for "whose turn / winner",
+green felt tray for dice, two-column scorecard, per-player totals strip, live table board,
+session tally. Light + dark follow the system, with manual toggles for theme, haptics
+(off by default) and animation. Reduced motion is honoured in CSS and via `html.no-motion`.
+
+## More contract gotchas
+15. **Four header icon buttons at 44px + gaps overflow 390px** (`html scrollWidth 405`).
+    `.btn-icon` needs `width: 44px` and `.round-wrap` needs `flex:1 1 auto; min-width:0`.
+16. **The hand-over note must never be caught mid-fade**: it used to fade to 0.6 and
+    measured 4.37:1 in a screenshot. It is now 18px on `--ink`, holds full opacity for its
+    whole life, and is cleared by a timer *and* by the next pointerdown on the game screen.
+17. **Playwright refuses to click a hidden element.** In table mode `#roll` and the dice are
+    genuinely hidden — probes and audits must not try to use them.
+18. `$('board-note')` — renderBoard threw for 3 of the contract tests before the
+    element had an id. Any new `$('…')` reference needs the id on the element.
+19. **The board note doubles as the across-the-table session line** (operator point 4):
+    once an evening tally exists it reads "Tonight · N games · leader X pts, Y wins".
+20. An 18-char name (`Tomas Tomas Tomas T`) must fit the two-column grid at 390px: the key
+    tools sit beside a `3 × 62px` pill rather than on their own row, which also keeps the
+    whole keypad + first boxes above the SE fold.
+
 ## Faces must be faithful (the operator's blocker)
 21. **A badge on a keypad key is a pip to the player.** The per-face count used to sit
     in the key's top-right corner — exactly the top-right pip's place — so the 4 key
@@ -83,49 +131,3 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
     hides the "Ana's scorecard" title so the button owns the row's full width; the label
     then shrinks itself to 11px rather than ellipsising (a truncated Undo is the vagueness
     the label exists to remove). `scripts/handover.mjs` asserts `scrollWidth <= clientWidth`.
-## Two dice modes (the operator's most important path)
-- `prefs.dice` is `'phone'` (default, so every contract check behaves as before) or
-  `'table'`. Real-dice state lives in the ENGINE (`g.entry` + `setEntryFace` /
-  `clearEntry` / `syncEntry`), not the UI, so scoring, Joker and bonuses are shared
-  and the entry resumes with the saved game for free. `syncEntry` sets
-  `dice/rolledCount=1/rollsLeft=0` only when all five faces are in, so "nothing
-  recordable before 5/5" falls out of the existing `rolledCount` gate.
-- In table mode the tray swaps `#dice` + `#roll-row` for `#slots` + `#keypad`
-  (`setTrayMode`). Hidden halves get `inert` too, and `[hidden] { display:none !important }`
-  is global — `.btn`'s `display:inline-flex` otherwise beats `hidden`.
-- Undo restores the WHOLE turn (`g.lastRecord.prev` = dice/held/rollsLeft/rolledCount/entry)
-  and stays offered until the next player *touches* the turn (`turnTouched`), in both modes.
-- Switching modes carries a half-played turn across (`transferTurn`) and is guarded by an
-  assertion that no card string changed.
-
-## More contract gotchas
-15. **Four header icon buttons at 44px + gaps overflow 390px** (`html scrollWidth 405`).
-    `.btn-icon` needs `width: 44px` and `.round-wrap` needs `flex:1 1 auto; min-width:0`.
-16. **The hand-over toast is text the checks can catch mid-fade**: at 17px on `--ink`
-    it measured 4.37:1 at 0.54 opacity. It is now 18px (large-text 3:1), its exit stops at
-    0.6 opacity, and `showHandover` self-clears — a toast parked at final opacity is
-    failure #13 all over again.
-17. **Playwright refuses to click a hidden element.** In table mode `#roll` and the dice are
-    genuinely hidden — probes and audits must not try to use them.
-18. `$('board-note')` — renderBoard threw for 3 of the contract tests before the
-    element had an id. Any new `$('…')` reference needs the id on the element.
-19. **The board note doubles as the across-the-table session line** (operator point 4):
-    once an evening tally exists it reads "Tonight · N games · leader X pts, Y wins".
-20. An 18-char name (`Tomas Tomas Tomas T`) must fit the two-column grid at 390px: the key
-    tools sit beside a `3 × 62px` pill rather than on their own row, which also keeps the
-    whole keypad + first boxes above the SE fold.
-
-## Verifying
-`bash scripts/verify.sh` (or `npm run verify`) runs everything: unit+oracle tests, the (`realdice.mjs` plays whole table-mode games with 3 and 8 players and re-checks them against the engine; `audits/realdice.spec.ts` audits the keypad, slots and mode sheet, which the contract suite never sees)`bash scripts/verify.sh` (or `npm run verify`) runs everything: unit+oracle tests, the
-contract suite, my visual audit, layout fit, sub-path hosting, offline, SW-update path,
-interaction hazards, edge cases, and three whole games re-checked against the engine.
-It expects the built app on `$APP_URL` (default http://localhost:3000).
-`audits/many-players.spec.ts` covers the 8-player extremes the contract suite never reaches.
-Probe scripts live in `scripts/` and take `SHOT_URL`/`APP_URL`; they must be self-contained
-(no leftover background servers on fixed ports — that already rotted once).
-
-## Design system
-Warm-tin "camp tin" theme, `--ink` on `--bg`, gold accent band for "whose turn / winner",
-green felt tray for dice, two-column scorecard, per-player totals strip, live table board,
-session tally. Light + dark follow the system, with manual toggles for theme, haptics
-(off by default) and animation. Reduced motion is honoured in CSS and via `html.no-motion`.
