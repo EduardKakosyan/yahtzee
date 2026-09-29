@@ -755,11 +755,22 @@ function renderGame(tumbled) {
   // mistake is usually spotted a few seconds late.
   const undoable = !!g.lastRecord && !g.finished && !turnTouched(g);
   undoBtn.classList.toggle('invisible', !undoable);
+  $('card-head').classList.toggle('has-undo', undoable);
   undoBtn.setAttribute('aria-disabled', undoable ? 'false' : 'true');
   if (undoable) {
     const rec = g.lastRecord;
     const who = g.players[rec.playerIndex].name;
-    $('undo-who').textContent = who === player.name ? ' yours' : ` ${who}’s`;
+    // say the whole thing out loud: a bare "Undo Eduard's" makes people hunt for
+    // which box they are about to lose.
+    const whose = who === player.name ? 'your' : `${who}’s`;
+    const txt = $('undo-txt');
+    txt.style.fontSize = '';
+    txt.textContent = `Undo ${whose} ${LABEL[rec.cat]} (${rec.value})`;
+    // a 16-character name on a 375px phone cannot say all of that at 15px, and an
+    // ellipsis here is exactly the vagueness the label exists to remove.
+    for (let size = 15; size > 11 && txt.scrollWidth > txt.clientWidth; size -= 0.5) {
+      txt.style.fontSize = `${size}px`;
+    }
     undoBtn.setAttribute('aria-label',
       who === player.name
         ? `Undo your ${LABEL[rec.cat]} (${rec.value})`
@@ -869,14 +880,25 @@ function onUndo() {
   announce('Score undone.');
 }
 
+/** Cover the dice row the next player no longer needs, measured from its own box so
+ *  the note can never spill onto the roll button, the keypad or a score box. */
+function positionHandover(b) {
+  const band = tableMode() && !$('slots').hidden ? $('slots') : $('dice');
+  b.style.top = `${band.offsetTop}px`;
+  b.style.height = `${band.offsetHeight}px`;
+  b.style.left = `${band.offsetLeft}px`;
+  b.style.width = `${band.offsetWidth}px`;
+}
+
 function showHandover(text) {
   const b = $('handover');
   b.textContent = text;
   b.classList.remove('show');
+  positionHandover(b);
   void b.offsetWidth;
   if (prefs.motion) b.classList.add('show');
   clearTimeout(showHandover.timer);
-  showHandover.timer = setTimeout(hideHandover, prefs.motion ? 1400 : 2200);
+  showHandover.timer = setTimeout(hideHandover, prefs.motion ? 1500 : 2200);
 }
 
 /** A "pass the phone" toast is about a turn that no longer exists once the game
@@ -1215,11 +1237,19 @@ function buildEntry() {
     const b = el('button', 'key', 'entry-key');
     b.type = 'button';
     b.dataset.face = String(f);
+    // face on top, its number and count in a strip UNDER it: nothing may ever sit
+    // on a pip, or the key stops being a faithful picture of the die on the table.
     const face = el('span', 'kface');
+    face.setAttribute('aria-hidden', 'true');
     pipsInto(face, f, 4);
     b.appendChild(face);
-    const count = el('span', 'key-count');
-    b.appendChild(count);
+    const label = el('span', 'klabel');
+    label.setAttribute('aria-hidden', 'true');
+    const num = el('span', 'knum');
+    num.textContent = String(f);
+    const count = el('span', 'kcount');
+    label.append(num, count);
+    b.appendChild(label);
     b.addEventListener('click', () => onKeyTap(f));
     keys.appendChild(b);
     keyEls[f] = b;
@@ -1251,7 +1281,9 @@ function renderEntry(g, popSlot) {
   for (let f = 1; f <= 6; f++) {
     const b = keyEls[f];
     b.dataset.count = String(counts[f]);
-    b.querySelector('.key-count').textContent = counts[f] ? String(counts[f]) : '';
+    // 0 must show nothing at all: an always-on marker read as a pip and made the
+    // 4/5/6 keys look like the wrong face.
+    b.querySelector('.kcount').textContent = counts[f] ? `×${counts[f]}` : '';
     b.setAttribute('aria-label', `Enter a ${f}`
       + (counts[f] ? `, ${counts[f]} of these in already` : '')
       + (target >= 0 ? `, goes in die ${target + 1}` : ', all five dice are already in'));
@@ -1432,6 +1464,8 @@ function boot() {
     addPlayerFromInput();
   });
   $('start-game').addEventListener('click', startGame);
+  // the hand-over note steps aside the moment the new player starts working
+  $('screen-game').addEventListener('pointerdown', hideHandover);
   $('roll').addEventListener('click', onRoll);
   $('undo').addEventListener('click', onUndo);
   $('play-again').addEventListener('click', playAgain);

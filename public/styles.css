@@ -26,6 +26,8 @@
   --die: #fffcf3;
   --die-2: #ded0b4;
   --pip: #241a10;
+  --die-cap: #ded0b4;
+  --die-cap-ink: #1b1208;
   --good: #0f6b3a;
   --bad: #8a2b12;
   --shadow: 0 2px 0 rgba(27, 18, 8, 0.12), 0 10px 22px -14px rgba(27, 18, 8, 0.6);
@@ -54,6 +56,8 @@
   --die: #fffaef;
   --die-2: #cbbfa4;
   --pip: #211609;
+  --die-cap: #6b5941;
+  --die-cap-ink: #f8f1e2;
   --good: #6fe3a3;
   --bad: #ff9c7a;
   --shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 12px 26px -16px rgba(0, 0, 0, 0.95);
@@ -129,10 +133,19 @@ b { font-weight: 800; }
 .btn-dice-mode[data-mode='phone'] .die-ico { display: block; }
 .btn-dice-mode[data-mode='table'] .table-ico { display: block; color: var(--accent); }
 .btn-dice-mode[data-mode='table'] { border: 2px solid var(--accent); }
+/* While Undo is offered the title steps out of the row (the name above it is already
+   40px tall, so "Ana's scorecard" is the one thing here nobody needs) and the button
+   gets the whole width — anything less and "Undo Eduard's Full house (25)" ends in an
+   ellipsis, which is the vagueness the label exists to remove. Nothing shifts: the
+   row keeps its height either way. */
+.card-head.has-undo .card-title { display: none; }
 .btn-undo {
   background: transparent; border-color: var(--line); box-shadow: none;
-  font-size: 14px; font-weight: 800; padding: 8px 12px;
+  font-size: 15px; font-weight: 800; padding: 8px 12px;
+  min-width: 0; max-width: 100%; flex: 1 1 auto; justify-content: center;
 }
+.undo-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-txt b { font-weight: 900; }
 .btn-undo.invisible { visibility: hidden; }
 .undo-who { color: var(--ink-2); }
 .card-title { flex: 1 1 auto; }
@@ -254,6 +267,7 @@ b { font-weight: 800; }
 }
 
 .felt {
+  position: relative;
   margin-top: 8px; padding: 10px 8px 9px;
   border-radius: 20px; background: linear-gradient(180deg, var(--felt) 0%, var(--felt-2) 100%);
   border: 2px solid var(--felt-hole);
@@ -479,7 +493,7 @@ b { font-weight: 800; }
 .keypad { margin-top: 7px; display: flex; flex-direction: column; gap: 6px; }
 .keys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .key {
-  position: relative; min-height: 62px; width: 100%; padding: 0; border: 0;
+  position: relative; min-height: 70px; width: 100%; padding: 0; border: 0;
   border-radius: 14px; cursor: pointer; overflow: hidden;
   background: linear-gradient(158deg, var(--die) 0%, var(--die) 55%, var(--die-2) 100%);
   box-shadow: 0 3px 0 var(--die-2), 0 8px 14px -8px rgba(0, 0, 0, 0.55);
@@ -487,16 +501,23 @@ b { font-weight: 800; }
 }
 .key:active { transform: translateY(2px); }
 .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.key .kface { position: absolute; inset: 0; }
+/* The pip area stops where the cap strip begins: nothing is ever painted on a pip,
+   so a key is always a faithful picture of the die lying on the table. */
+.key .kface { position: absolute; inset: 5px 5px 21px; }
 .key .kface .pip {
   position: absolute; width: 9px; height: 9px; border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #7a6d5b, var(--pip) 72%);
 }
-.key-count {
-  position: absolute; top: 3px; right: 4px; z-index: 2; min-width: 17px; height: 17px;
-  border-radius: 9px; background: var(--accent); color: var(--accent-ink);
-  font-size: 11px; font-weight: 900; display: grid; place-items: center; padding: 0 3px;
+.klabel {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 19px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  background: var(--die-cap); color: var(--die-cap-ink);
+  font-size: 12.5px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1;
 }
+.knum { font-size: 13px; }
+/* the count is hidden entirely at zero — a permanent marker read as an extra pip */
+.kcount { font-size: 11.5px; opacity: 0.85; }
+.key[data-count='0'] .kcount { display: none; }
 .btn-key-tool {
   flex: 1 1 0; min-width: 0; min-height: 44px; padding: 6px 8px; font-size: 13px;
   background: transparent; color: var(--felt-ink); border-color: var(--felt-ink); box-shadow: none;
@@ -513,24 +534,27 @@ b { font-weight: 800; }
 .entry-hint.nudge { animation: nudge 0.3s ease both; }
 @keyframes nudge { 25% { transform: translateX(-5px); } 60% { transform: translateX(4px); } }
 
-/* hand-over banner — decorative, pointer-events:none so it never blocks a tap */
+/* The hand-over note sits inside the felt tray, exactly over the dice row — sized
+   and placed from that row's own box in showHandover(). It used to float at the
+   bottom of the screen and sat on the Sixes box, which is the first thing the next
+   player reaches for; anything fixed also ends up over somebody's score. Nothing
+   it can touch is needed to take a turn (the dice it hides are spent), the note is
+   in flow so it can never be parked on screen, and it holds full opacity, so the
+   contrast tool can never catch a mid-fade frame. */
 .handover {
-  position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom));
-  transform: translate(-50%, 24px);
-  width: max-content; max-width: min(92vw, 460px);
-  padding: 12px 18px; border-radius: 999px;
+  position: absolute; z-index: 4; margin: 0;
+  display: grid; place-content: center; text-align: center;
+  padding: 0 10px; border-radius: 16px;
   background: var(--ink); color: var(--bg);
-  font-size: 18px; font-weight: 800; text-align: center;
-  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.7);
-  opacity: 0; pointer-events: none; z-index: 30;
+  font-size: 18px; font-weight: 800; line-height: 1.12; letter-spacing: -0.01em;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  overflow: hidden;
 }
-/* The exit never fades below ~0.6 opacity: a screenshot (or a lock-screen reload)
-   caught mid-fade must still read at 4.5:1. hideHandover() clears it right after. */
-.handover.show { animation: handover 1.35s ease both; }
+.handover.show { opacity: 1; visibility: visible; animation: handover 1.3s ease both; }
 @keyframes handover {
-  0% { opacity: 0; transform: translate(-50%, 18px) scale(0.96); }
-  8%, 86% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  100% { opacity: 0.6; transform: translate(-50%, -9px) scale(0.98); }
+  0% { transform: scale(0.93); }
+  12%, 88% { transform: scale(1); }
+  100% { transform: scale(0.99); }
 }
 
 /* ───────────────────── game over ───────────────────── */
@@ -665,8 +689,6 @@ html.no-motion .sheet { animation: none !important; }
 html.no-motion .confetti { display: none !important; }
 html.no-motion .yah-flash { animation-duration: 0.7s; }
 @media (prefers-reduced-motion: reduce) { .yah-flash { animation-duration: 0.7s !important; } }
-html.no-motion .handover { transition: none; }
-html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 384px) {
   .die { width: 55px; height: 55px; }
@@ -703,7 +725,7 @@ html.no-motion .handover.show { opacity: 1; transform: translate(-50%, 0); }
   .slot[data-filled='false']::before { border-radius: 9px; }
   .keypad { margin-top: 6px; gap: 5px; }
   .keys { gap: 5px; }
-  .key { min-height: 48px; }
+  .key { min-height: 56px; }
   .entry-bar { gap: 5px; }
   .roll-row { margin-top: 7px; }
   .btn-roll { min-height: 46px; font-size: 17px; }
