@@ -58,38 +58,6 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
 14. **`.btn`'s `display:inline-flex` beats the `hidden` attribute.** Hide helper buttons with
     the `.invisible` class (`visibility:hidden`), which also keeps layout stable.
 
-## Two dice modes (the operator's most important path)
-- `prefs.dice` is `'phone'` (default, so every contract check behaves as before) or
-  `'table'`. Real-dice state lives in the ENGINE (`g.entry` + `setEntryFace` /
-  `clearEntry` / `syncEntry`), not the UI, so scoring, Joker and bonuses are shared
-  and the entry resumes with the saved game for free. `syncEntry` sets
-  `dice/rolledCount=1/rollsLeft=0` only when all five faces are in, so "nothing
-  recordable before 5/5" falls out of the existing `rolledCount` gate.
-- In table mode the tray swaps `#dice` + `#roll-row` for `#slots` + `#keypad`
-  (`setTrayMode`). Hidden halves get `inert` too, and `[hidden] { display:none !important }`
-  is global — `.btn`'s `display:inline-flex` otherwise beats `hidden`.
-- Undo restores the WHOLE turn (`g.lastRecord.prev` = dice/held/rollsLeft/rolledCount/entry)
-  and stays offered until the next player *touches* the turn (`turnTouched`), in both modes.
-- Switching modes carries a half-played turn across (`transferTurn`) and is guarded by an
-  assertion that no card string changed.
-
-## Verifying
-`bash scripts/verify.sh` (or `npm run verify`) runs everything: unit+oracle tests, the
-contract suite, my visual audit, layout fit (both phones, both dice modes, 3 and 8
-players), the keypad face probe, the hand-over/Undo probe, sub-path hosting, offline,
-SW-update path, interaction hazards, edge cases, three whole phone-mode games and whole
-table-mode games (3 and 8 players) re-checked against the engine.
-It expects the built app on `$APP_URL` (default http://localhost:3000).
-`audits/many-players.spec.ts` covers the 8-player extremes the contract suite never reaches.
-Probe scripts live in `scripts/` and take `SHOT_URL`/`APP_URL`; they must be self-contained
-(no leftover background servers on fixed ports — that already rotted once).
-
-## Design system
-Warm-tin "camp tin" theme, `--ink` on `--bg`, gold accent band for "whose turn / winner",
-green felt tray for dice, two-column scorecard, per-player totals strip, live table board,
-session tally. Light + dark follow the system, with manual toggles for theme, haptics
-(off by default) and animation. Reduced motion is honoured in CSS and via `html.no-motion`.
-
 ## More contract gotchas
 15. **Four header icon buttons at 44px + gaps overflow 390px** (`html scrollWidth 405`).
     `.btn-icon` needs `width: 44px` and `.round-wrap` needs `flex:1 1 auto; min-width:0`.
@@ -131,3 +99,35 @@ session tally. Light + dark follow the system, with manual toggles for theme, ha
     hides the "Ana's scorecard" title so the button owns the row's full width; the label
     then shrinks itself to 11px rather than ellipsising (a truncated Undo is the vagueness
     the label exists to remove). `scripts/handover.mjs` asserts `scrollWidth <= clientWidth`.
+
+## Two dice modes (the operator's most important path)
+- `prefs.dice` is `'phone'` (default, so every contract check behaves as before) or
+  `'table'`. Real-dice state lives in the ENGINE (`g.entry` + `setEntryFace` /
+  `clearEntry` / `syncEntry`), not the UI, so scoring, Joker and bonuses are shared
+  and the entry resumes with the saved game for free. `syncEntry` sets
+  `dice/rolledCount=1/rollsLeft=0` only when all five faces are in, so "nothing
+  recordable before 5/5" falls out of the existing `rolledCount` gate.
+- In table mode the tray swaps `#dice` + `#roll-row` for `#slots` + `#keypad`
+  (`setTrayMode`). Hidden halves get `inert` too, and `[hidden] { display:none !important }`
+  is global — `.btn`'s `display:inline-flex` otherwise beats `hidden`.
+- Undo restores the WHOLE turn (`g.lastRecord.prev` = dice/held/rollsLeft/rolledCount/entry)
+  and stays offered until the next player *touches* the turn (`turnTouched`), in both modes.
+- Switching modes carries a half-played turn across (`transferTurn`) and is guarded by an
+  assertion that no card string changed.
+
+## Verifying
+`bash scripts/verify.sh` (or `npm run verify`) runs everything: unit+oracle tests, the
+contract suite, my visual audit, layout fit (both phones, both dice modes, 3 and 8
+players), the keypad face probe, the hand-over/Undo probe, sub-path hosting, offline,
+SW-update path, interaction hazards, edge cases, three whole phone-mode games and whole
+table-mode games (3 and 8 players) re-checked against the engine.
+It expects the built app on `$APP_URL` (default http://localhost:3000).
+`audits/many-players.spec.ts` covers the 8-player extremes the contract suite never reaches.
+Probe scripts live in `scripts/` and take `SHOT_URL`/`APP_URL`; they must be self-contained
+(no leftover background servers on fixed ports — that already rotted once).
+
+## Design system
+Warm-tin "camp tin" theme, `--ink` on `--bg`, gold accent band for "whose turn / winner",
+green felt tray for dice, two-column scorecard, per-player totals strip, live table board,
+session tally. Light + dark follow the system, with manual toggles for theme, haptics
+(off by default) and animation. Reduced motion is honoured in CSS and via `html.no-motion`.
