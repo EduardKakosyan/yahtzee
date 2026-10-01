@@ -645,6 +645,10 @@ b { font-weight: 800; }
 }
 .sheet-body .rules { display: flex; flex-direction: column; gap: 6px; }
 .sheet .btn-primary { margin-top: 12px; flex: none; }
+.game-option-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.game-option-list .btn { justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+#game-options { font-size: 12px; padding: 0; }
+#game-options-sheet .sheet { overflow-y: auto; }
 
 /* ───────────────────── the table / glance standings ─────────────────────
    For when the phone is lying face-up in the middle of the table: standings at a

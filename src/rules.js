@@ -182,6 +182,7 @@ export function newGame(names, startIndex = 0) {
     held: [false, false, false, false, false],
     entry: emptyEntry(),
     lastRecord: null,
+    history: [],
     finished: false,
   };
 }
@@ -213,6 +214,7 @@ export function record(g, cat, dice = g.dice) {
   if (card[cat] != null) return false;
   if (!allowedBoxes(card, dice).includes(cat)) return false;
   const bonus = bonusEarned(card, dice);
+  if (!Array.isArray(g.history)) g.history = g.lastRecord ? [g.lastRecord] : [];
   card[cat] = potential(card, cat, dice);
   card.yahtzeeBonus += bonus;
   g.lastRecord = {
@@ -231,13 +233,14 @@ export function record(g, cat, dice = g.dice) {
     },
     wasYahtzeeMoment: cat === 'yahtzee' && card[cat] === 50,
   };
+  g.history.push(g.lastRecord);
   resetTurn(g);
   g.finished = g.players.every((p) => CATEGORIES.every((k) => p.card[k] != null));
   return true;
 }
 
 export function undo(g) {
-  if (g.finished || !g.lastRecord) return false;
+  if (!g.lastRecord) return false;
   const { playerIndex, cat, value, bonus, prev } = g.lastRecord;
   const card = g.players[playerIndex].card;
   if (card[cat] !== value) return false;
@@ -259,7 +262,19 @@ export function undo(g) {
     g.held = [false, false, false, false, false];
     g.entry = emptyEntry();
   }
-  g.lastRecord = null;
+  if (Array.isArray(g.history)) g.history.pop();
+  g.lastRecord = g.history?.at(-1) ?? null;
+  g.finished = false;
+  return true;
+}
+
+export function restartTurn(g) {
+  if (g.finished) return false;
+  g.dice = [0, 0, 0, 0, 0];
+  g.held = [false, false, false, false, false];
+  g.entry = emptyEntry();
+  g.rolledCount = 0;
+  g.rollsLeft = 3;
   return true;
 }
 

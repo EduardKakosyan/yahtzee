@@ -186,6 +186,7 @@ function newGame(names, startIndex = 0) {
     held: [false, false, false, false, false],
     entry: emptyEntry(),
     lastRecord: null,
+    history: [],
     finished: false,
   };
 }
@@ -217,6 +218,7 @@ function record(g, cat, dice = g.dice) {
   if (card[cat] != null) return false;
   if (!allowedBoxes(card, dice).includes(cat)) return false;
   const bonus = bonusEarned(card, dice);
+  if (!Array.isArray(g.history)) g.history = g.lastRecord ? [g.lastRecord] : [];
   card[cat] = potential(card, cat, dice);
   card.yahtzeeBonus += bonus;
   g.lastRecord = {
@@ -235,13 +237,14 @@ function record(g, cat, dice = g.dice) {
     },
     wasYahtzeeMoment: cat === 'yahtzee' && card[cat] === 50,
   };
+  g.history.push(g.lastRecord);
   resetTurn(g);
   g.finished = g.players.every((p) => CATEGORIES.every((k) => p.card[k] != null));
   return true;
 }
 
 function undo(g) {
-  if (g.finished || !g.lastRecord) return false;
+  if (!g.lastRecord) return false;
   const { playerIndex, cat, value, bonus, prev } = g.lastRecord;
   const card = g.players[playerIndex].card;
   if (card[cat] !== value) return false;
@@ -263,7 +266,19 @@ function undo(g) {
     g.held = [false, false, false, false, false];
     g.entry = emptyEntry();
   }
-  g.lastRecord = null;
+  if (Array.isArray(g.history)) g.history.pop();
+  g.lastRecord = g.history?.at(-1) ?? null;
+  g.finished = false;
+  return true;
+}
+
+function restartTurn(g) {
+  if (g.finished) return false;
+  g.dice = [0, 0, 0, 0, 0];
+  g.held = [false, false, false, false, false];
+  g.entry = emptyEntry();
+  g.rolledCount = 0;
+  g.rollsLeft = 3;
   return true;
 }
 
@@ -384,6 +399,7 @@ function sanitizeGame(g) {
   } else {
     g.lastRecord = null;
   }
+  g.history = Array.isArray(g.history) ? g.history.slice(0, 13 * n) : (g.lastRecord ? [g.lastRecord] : []);
   return g;
 }
 
@@ -874,10 +890,107 @@ function onScoreTap(key) {
 function onUndo() {
   const g = state.game;
   if (!g || g.finished || !g.lastRecord || turnTouched(g)) return;
-  if (!undo(g)) return;
+  performUndo();
+}
+
+function removeGameFromSession() {
+  const g = state.game;
+  if (!g.finished || !state.session) return;
+  const contribution = sessionFromGame(g);
+  state.session.players.forEach((p, i) => {
+    p.points -= contribution.players[i].points;
+    p.wins -= contribution.players[i].wins;
+  });
+  state.session.gamesPlayed -= 1;
+  state.session.nextStart = g.startIndex;
+  if (state.session.gamesPlayed === 0) state.session = null;
+}
+
+function performUndo() {
+  const g = state.game;
+  if (!g?.lastRecord) return;
+  const rec = g.lastRecord;
+  // A completed game has already contributed its points and wins to the evening.
+  const session = state.session ? structuredClone(state.session) : null;
+  removeGameFromSession();
+  if (!undo(g)) { state.session = session; return; }
+  transferTurn(g, prefs.dice);
+  resetEntryFocus(g);
+  hideHandover();
+  setScreen('game');
   save();
   renderGame();
-  announce('Score undone.');
+  $('game-options').focus();
+  announce(`${g.players[rec.playerIndex].name}'s ${LABEL[rec.cat]} undone.`);
+}
+
+let pendingGameAction = null;
+function openGameOptions() {
+  if ($('game-options-sheet').hidden) lastFocused = $(state.screen === 'over' ? 'game-options-over' : 'game-options');
+  pendingGameAction = null;
+  $('game-confirm').hidden = true;
+  $('game-option-list').hidden = false;
+  const g = state.game;
+  $('option-undo').disabled = !g?.lastRecord;
+  $('option-undo').textContent = g?.lastRecord
+    ? `Undo ${g.players[g.lastRecord.playerIndex].name}'s ${LABEL[g.lastRecord.cat]} (${g.lastRecord.value})`
+    : 'Undo last turn';
+  $('option-restart-turn').disabled = !g || g.finished || !turnTouched(g);
+  $('game-options-sheet').hidden = false;
+  $('app').inert = true;
+  $('game-options-close').focus();
+}
+
+function closeGameOptions() {
+  $('game-options-sheet').hidden = true;
+  $('app').inert = false;
+  pendingGameAction = null;
+  lastFocused?.focus?.();
+}
+
+function requestGameAction(action) {
+  const g = state.game;
+  if (!g) return;
+  if (action === 'undo' && !g.finished && !turnTouched(g)) {
+    closeGameOptions();
+    performUndo();
+    return;
+  }
+  const messages = {
+    undo: 'Undo the last recorded score? The current dice will be discarded and the previous player gets their turn back. If the game has ended, its result is removed from tonight\'s tally until you finish again.',
+    turn: 'Restart this turn? Clear the current dice and holds, with three rolls available again. All recorded scores stay.',
+    reset: 'Reset this game to round 1? All scores in this game are cleared. Keep the same players, starting player, dice mode and earlier games in tonight\'s tally. A completed result for this game is removed.',
+    players: 'Return to player setup? Discard an unfinished game. Completed games stay in tonight\'s tally until you change the player list.',
+  };
+  pendingGameAction = action;
+  $('game-confirm-text').textContent = messages[action];
+  $('game-option-list').hidden = true;
+  $('game-confirm').hidden = false;
+  $('game-confirm-cancel').focus();
+}
+
+function confirmGameAction() {
+  const action = pendingGameAction;
+  closeGameOptions();
+  if (action === 'undo') { performUndo(); return; }
+  hideHandover();
+  if (action === 'turn') {
+    restartTurn(state.game);
+    resetEntryFocus(state.game);
+    save();
+    renderGame();
+    $('game-options').focus();
+    announce('Turn restarted. Recorded scores unchanged.');
+  } else if (action === 'reset') {
+    const start = state.game.startIndex;
+    state.players = state.game.players.map((p) => p.name);
+    removeGameFromSession();
+    beginGame(start);
+    $('game-options').focus();
+  } else if (action === 'players') {
+    changePlayers();
+    $('player-name').focus();
+  }
 }
 
 /** Cover the dice row the next player no longer needs, measured from its own box so
@@ -1473,10 +1586,22 @@ function boot() {
   $('screen-game').addEventListener('pointerdown', hideHandover);
   $('roll').addEventListener('click', onRoll);
   $('undo').addEventListener('click', onUndo);
+  $('game-options').addEventListener('click', openGameOptions);
+  $('game-options-over').addEventListener('click', openGameOptions);
+  $('game-options-close').addEventListener('click', closeGameOptions);
+  $('option-undo').addEventListener('click', () => requestGameAction('undo'));
+  $('option-restart-turn').addEventListener('click', () => requestGameAction('turn'));
+  $('option-reset').addEventListener('click', () => requestGameAction('reset'));
+  $('option-players').addEventListener('click', () => requestGameAction('players'));
+  $('game-confirm-accept').addEventListener('click', confirmGameAction);
+  $('game-confirm-cancel').addEventListener('click', openGameOptions);
+  $('game-options-sheet').addEventListener('click', (e) => {
+    if (e.target.classList.contains('sheet-backdrop')) closeGameOptions();
+  });
   $('play-again').addEventListener('click', playAgain);
   $('change-players').addEventListener('click', changePlayers);
   $('how-setup').addEventListener('click', openSheet);
-  $('how-game').addEventListener('click', openSheet);
+  $('how-game').addEventListener('click', () => { closeGameOptions(); openSheet(); });
   $('how-close').addEventListener('click', closeSheet);
   $('how-sheet').addEventListener('click', (e) => {
     if (e.target.dataset.close || e.target.classList.contains('sheet-backdrop')) closeSheet();
@@ -1498,6 +1623,17 @@ function boot() {
     if (e.target.dataset.close || e.target.classList.contains('sheet-backdrop')) closeTableSheet();
   });
   document.addEventListener('keydown', (e) => {
+    if (!$('game-options-sheet').hidden) {
+      if (e.key === 'Escape') { closeGameOptions(); return; }
+      if (e.key === 'Tab') {
+        const buttons = [...$('game-options-sheet').querySelectorAll('button')].filter((b) => !b.disabled && b.getClientRects().length);
+        const first = buttons[0];
+        const last = buttons.at(-1);
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+      return;
+    }
     if (e.key !== 'Escape') return;
     if (!$('dice-sheet').hidden) closeDiceSheet();
     else if (!$('table-sheet').hidden) closeTableSheet();

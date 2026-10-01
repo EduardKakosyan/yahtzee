@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<div class="app">
+<div class="app" id="app">
 
   <!-- ══════════════════════ SETUP ══════════════════════ -->
   <section id="screen-setup" class="screen setup" data-testid="setup" aria-labelledby="setup-title">
@@ -165,12 +165,8 @@
             <path d="M16.2 5.4a3.1 3.1 0 0 1 0 6M17.6 13.9c2.2.5 3.4 2.3 3.4 4.6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
           </svg>
         </button>
-        <button type="button" class="btn btn-icon" id="how-game" data-testid="how-to-play" aria-label="How to play">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
-            <path d="M9.7 9.3c0-1.4 1-2.4 2.4-2.4s2.4 1 2.3 2.3c0 1.6-2.3 1.8-2.3 3.4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-            <circle cx="12.1" cy="16.4" r="1.2" fill="currentColor"/>
-          </svg>
+        <button type="button" class="btn btn-icon" id="game-options" aria-label="Game options: undo, restart or reset" aria-haspopup="dialog">
+          Game
         </button>
         <button type="button" class="btn btn-icon" id="theme-game" aria-label="Switch color theme">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
@@ -273,6 +269,7 @@
       </button>
       <p class="over-note" id="play-again-note"></p>
       <button type="button" class="btn btn-ghost" data-testid="change-players" id="change-players">Change players</button>
+      <button type="button" class="btn btn-ghost" id="game-options-over" aria-haspopup="dialog">Game options: undo or reset</button>
     </div>
   </section>
 
@@ -298,7 +295,9 @@
       <p><b>The game.</b> 13 rounds; everyone takes one turn each round, in seating order. A turn is up to
         <b>three rolls</b>. After the first and second roll you may hold any dice — held dice keep their value,
         tap one again to release it. After one, two or three rolls you <b>must</b> score in exactly one open box,
-        and that score is final.</p>
+        and that score is recorded. To correct a mistake, use <b>Undo</b> or open <b>Game</b> in the top bar.</p>
+      <h3>Fix a mistake or start fresh</h3>
+      <p><b>Game</b> offers undo of recorded turns (including the final turn), restart of the current turn, reset to round 1 with the same players, and player setup. Undo history survives a reload. Restart and reset ask first; earlier completed games in tonight's tally stay intact.</p>
       <h3>Upper section</h3>
       <p>Ones to Sixes: add up the dice showing that number. Reach <b>63</b> in the six upper boxes for a
         <b>35-point bonus</b>.</p>
@@ -371,6 +370,29 @@
     <p class="dice-mode-note" id="dice-sheet-note"></p>
     <p class="dice-mode-note"><b>Nobody’s scores change</b> when you switch.</p>
     <button type="button" class="btn btn-primary" id="dice-sheet-close">Done</button>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="game-options-sheet" hidden>
+  <div class="sheet-backdrop"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="game-options-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 class="sheet-title" id="game-options-title">Game options</h2>
+    <div class="game-option-list" id="game-option-list">
+      <button type="button" class="btn btn-ghost" id="option-undo">Undo last turn</button>
+      <button type="button" class="btn btn-ghost" id="option-restart-turn">Restart current turn</button>
+      <button type="button" class="btn btn-ghost" id="option-reset">Reset game</button>
+      <button type="button" class="btn btn-ghost" id="option-players">Change players / leave game</button>
+      <button type="button" class="btn btn-ghost" id="how-game" data-testid="how-to-play">How to play</button>
+    </div>
+    <div id="game-confirm" hidden>
+      <p class="dice-mode-note" id="game-confirm-text"></p>
+      <div class="game-option-list">
+        <button type="button" class="btn btn-ghost" id="game-confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="game-confirm-accept">Confirm</button>
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary" id="game-options-close">Back to game</button>
   </div>
 </div>
 

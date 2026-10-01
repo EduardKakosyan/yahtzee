@@ -111,7 +111,7 @@ from `/brief/checks`, read-only by agreement — never edit them to make them pa
   (`setTrayMode`). Hidden halves get `inert` too, and `[hidden] { display:none !important }`
   is global — `.btn`'s `display:inline-flex` otherwise beats `hidden`.
 - Undo restores the WHOLE turn (`g.lastRecord.prev` = dice/held/rollsLeft/rolledCount/entry)
-  and stays offered until the next player *touches* the turn (`turnTouched`), in both modes.
+  and the quick button stays offered until the next player *touches* the turn (`turnTouched`), in both modes. The Game menu can undo later, including the final turn, with confirmation. `g.history` persists recorded turns; `lastRecord` is its newest entry. Legacy saves migrate their one available record.
 - Switching modes carries a half-played turn across (`transferTurn`) and is guarded by an
   assertion that no card string changed.
 
@@ -125,6 +125,7 @@ It expects the built app on `$APP_URL` (default http://localhost:3000).
 `audits/many-players.spec.ts` covers the 8-player extremes the contract suite never reaches.
 Probe scripts live in `scripts/` and take `SHOT_URL`/`APP_URL`; they must be self-contained
 (no leftover background servers on fixed ports — that already rotted once).
+`npm run test:controls` starts its own server and runs the Game-menu tests in Chromium and WebKit. Install both browser binaries first. Undo/reset of a completed game must remove its session contribution before reopening it; earlier results remain. The generated `public/` files must be rebuilt and committed for Pages deployment.
 
 ## Design system
 Warm-tin "camp tin" theme, `--ink` on `--bg`, gold accent band for "whose turn / winner",

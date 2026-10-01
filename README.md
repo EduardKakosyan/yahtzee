@@ -3,7 +3,7 @@
 **▶ Play: https://eduardkakosyan.github.io/yahtzee/** (on an iPhone: open in Safari → Share → *Add to Home Screen*)
 
 > ### Built end to end by an autonomous agent running a local model
-> Nobody wrote this app by hand, and no cloud AI wrote it either. Every line of code, test, icon and design decision in this repository's history (18 commits) was produced by **Qwen3.8-Flash-Next**, an open-weights model running **locally on a single NVIDIA DGX Spark**. It worked unattended inside [**dgx-autonomy**](https://github.com/EduardKakosyan/dgx-autonomy), a self-governing build loop.
+> The original release was built without hand-written code or cloud AI. Its code, tests, icons and design decisions were produced by **Qwen3.8-Flash-Next**, an open-weights model running **locally on a single NVIDIA DGX Spark**. It worked unattended inside [**dgx-autonomy**](https://github.com/EduardKakosyan/dgx-autonomy), a self-governing build loop. The later game-management controls were added separately by CodeLayer, without invoking the DGX model.
 >
 > People supplied the brief and two rounds of product feedback: what a player sees, never how to code it. The agent planned, coded, tested, looked at its own screenshots, fixed its own bugs and committed its work, over about 24 hours of wall-clock time and four fresh conversations. Nobody answered its questions. It was graded by frozen acceptance checks it couldn't change.
 
@@ -21,7 +21,7 @@ Official-rules Yahtzee for **one phone passed around a table of friends**. It wa
 - **Roll real dice at the table, or on the phone.** In real-dice mode you tap in the five faces you rolled, and the app scores every box for you, so nobody does arithmetic and nobody gets the rules wrong.
 - **The official rules exactly:** the 35-point upper bonus at 63, the 100-point bonus for every extra Yahtzee, and the forced Joker placement rules.
 - **Game after game:** "Play game 2" keeps the same friends, rotates who starts, and keeps a running tally of wins and points for the evening.
-- **Undo** for the last recorded box, and a standings sheet readable from across the table.
+- **Game controls:** undo recorded turns, restart the current turn, reset the game, or return to player setup. A standings sheet stays readable from across the table.
 - **Works offline** once it's on your home screen. It resumes exactly where you were if the phone locks or Safari reloads. Light and dark themes, and phone-first down to an iPhone SE.
 
 ### Put it on an iPhone
@@ -32,6 +32,19 @@ Official-rules Yahtzee for **one phone passed around a table of friends**. It wa
 4. In setup, pick **"Real dice at the table"** if you're using real dice. The phone remembers the choice.
 
 It then plays with no connection at all. Scores live on that one phone.
+
+### Reset or correct a game
+
+Tap **Game** in the top bar (or **Game options: undo or reset** on the results screen).
+
+- **Undo** restores the previous player's dice, holds, rolls and score box. Repeat to undo earlier turns recorded by this version, even after reloading. Games saved by older versions retain their last recorded turn only. Undoing after the next player starts asks for confirmation and discards their current dice.
+- **Restart current turn** clears only that player's dice and holds, leaving recorded scores intact.
+- **Reset game** starts round 1 with the same players and starting player. It keeps dice-mode preferences and earlier completed games in tonight's tally.
+- **Change players / leave game** returns to setup. An unfinished game is discarded only after confirmation.
+
+Undoing or resetting a completed game removes its points and wins from tonight's tally; finishing it again counts the corrected result once. Restart and reset always ask for confirmation.
+
+If an existing home-screen install still shows the old interface, open it online, then close and reopen it after a few seconds so the service worker can load the update. Saved games remain on the phone.
 
 ## How an agent built it
 
@@ -46,7 +59,7 @@ The loop gave the builder a written brief and a set of frozen, executable accept
 | **Grading** | When the agent said "done", the environment ran the frozen checks in separate containers against the running app. Both claims passed 24/24. Real-dice mode was then played through as whole games (3 and 8 players, 143 turns, every box value checked against an independent rules implementation) with zero discrepancies. |
 | **Timeline** | Launched 28 Sep 2026 13:12 UTC; first claim 22:56; final claim after feedback 29 Sep 13:10 UTC |
 
-The git history is the agent's, unedited. The only human-side commit is the last one, which adds this README, the loop record (`loop/`), the screenshots and the Pages workflow. The agent's own README is kept at [`docs/builder-readme.md`](docs/builder-readme.md).
+The original builder history is preserved, followed by the README/Pages publication and later maintenance changes. The agent's own README is kept at [`docs/builder-readme.md`](docs/builder-readme.md).
 
 ## Run it yourself
 
@@ -56,6 +69,9 @@ node build.mjs                                   # rebuild public/ from src/
 node --test tests/rules.test.js tests/rules-oracle.test.js   # the agent's unit tests
 npm install && npx playwright install chromium
 APP_URL=http://localhost:3000 npx playwright test          # the frozen acceptance checks
+npx playwright install webkit
+npm run test:unit                                 # all rules and control tests
+npm run test:controls                             # reset/undo flows, Chromium and WebKit; starts its own server
 ```
 
 ## Part of dgx-autonomy
